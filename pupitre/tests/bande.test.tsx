@@ -303,6 +303,24 @@ test('une demande envoyée par un mod : le titre est sa demande, pas la phrase q
   await ui.unmount()
 })
 
+test('« Effacer les barres finies » : dès 2 barres finies, retire les vertes et garde celles en cours', async ($, on) => {
+  await preparer($, on)
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'a.md' }, agentId: 'a1' } as never)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'b.md' }, agentId: 'a2' } as never)
+  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', agentId: 'a1' } as never)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(await libelles(ui)).not.toContain('Effacer les barres finies') // une seule barre finie : sa croix suffit
+  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', agentId: 'a2' } as never)
+  expect(await libelles(ui)).toContain('Effacer les barres finies')
+  await ui.press({ key: 'effacer' })
+  const texte = JSON.stringify(await ui.drawn())
+  expect(texte).not.toContain('Sous-agent') // les deux sous-agents finis sont partis
+  expect(texte).toContain('fais ceci') // Claude travaille encore : sa ligne reste
+  expect(await libelles(ui)).not.toContain('Effacer les barres finies')
+  await ui.unmount()
+})
+
 test('un sous-agent fini reste affiché jusqu à la croix, même pendant que Claude travaille', async ($, on) => {
   const horloge = await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)

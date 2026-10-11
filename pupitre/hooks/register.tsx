@@ -151,6 +151,13 @@ async function fermerFil($: Dollar): Promise<void> {
   await majLignes($)
 }
 
+// « Effacer les barres finies » : retire toutes les barres vertes, d'ici et des autres discussions ; garde celles en cours.
+async function effacerFinies($: Dollar): Promise<void> {
+  for (const [k, s] of suivis) if (s.fin !== null) suivis.delete(k)
+  await majLignes($)
+  await update($, autresA, l => l.filter(a => a.finiLe === null))
+}
+
 async function revenir($: Dollar): Promise<void> {
   const p = await read($, plumeA)
   if (p.original === null) return
@@ -385,6 +392,12 @@ export const register: Register = on => {
     const T = $.ui.resolve(e) as unknown as Elements
     const r = await read($, reglagesA)
     const boutons: Bouton[] = []
+    const lignes = await read($, lignesA)
+    const autres = await read($, autresA)
+    // une seule barre finie : sa croix suffit
+    if (r.fil && lignes.filter(l => l.fini).length + autres.filter(a => a.finiLe !== null).length >= 2) {
+      boutons.push({ cle: 'effacer', libelle: 'Effacer les barres finies', action: () => { void effacerFinies($) } })
+    }
     const mesures = await read($, mesuresA)
     const relais = await read($, relaisA)
     const ctx = mesures.contexte.pct
@@ -401,8 +414,8 @@ export const register: Register = on => {
       reglages: r,
       mesures,
       cache: await read($, cacheA),
-      lignes: await read($, lignesA),
-      autres: await read($, autresA),
+      lignes,
+      autres,
       maintenant,
       boutons,
       fermer: () => { void fermerFil($) },
