@@ -6,7 +6,7 @@ import { AUCUN, basculer, changerSeuil, jaugeVisible, lireRelais, lireReglages, 
 import { MESURES_VIDES, lireMesures, pourcentageCache, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, messageHumain, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
+import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, explicationCache, messageHumain, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
@@ -433,10 +433,12 @@ export const register: Register = on => {
     boutons.push({ cle: 'reglages', libelle: 'Réglages', action: () => { void update($, ouvertA, o => !o) } })
     await read($, maintenantA) // abonne la bande au tic d'une seconde ; les images, elles, veulent l'heure exacte du dessin
     const maintenant = await $.clock.now()
+    const cache = await read($, cacheA)
     const arbre = dessinerBande(T, e.surface, e.props.bodyColumns, e.props.maxRows, {
       reglages: r,
       mesures,
-      cache: await read($, cacheA),
+      cache,
+      expliquerCache: () => { if (cache !== null) $.ui.toast(explicationCache(cache)) },
       lignes,
       autres,
       maintenant,

@@ -71,12 +71,14 @@ export function dessinerJauge(T: Elements, surface: string, colonnes: number, me
   )
 }
 
-// La ligne des boutons, sous la jauge, calée à droite ; à gauche, la part du cache quand on la connaît.
-export function dessinerBoutons(T: Elements, boutons: readonly Bouton[], cache: number | null) {
+// La ligne des boutons, sous la jauge, calée à droite ; à gauche, la part du cache quand on la connaît, qu'un clic explique.
+export function dessinerBoutons(T: Elements, boutons: readonly Bouton[], cache: number | null, expliquer?: () => void) {
   const { Box, Button, Text } = T
   return (
     <Box flexDirection="row" alignItems="center" justifyContent={cache === null ? 'flex-end' : 'space-between'} gap={1}>
-      {cache === null ? null : <Text dimColor wrap="truncate">{`Cache ${cache} %`}</Text>}
+      {cache === null ? null : expliquer
+        ? <Button key="cache" label={`Cache ${cache} % ⓘ`} plain dimColor onPress={() => expliquer()} />
+        : <Text dimColor wrap="truncate">{`Cache ${cache} %`}</Text>}
       <Box flexDirection="row" alignItems="center" gap={1}>
         {boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}
       </Box>
@@ -89,6 +91,7 @@ export type EtatBande = {
   maintenant: number // heure du dessin : chronos, et animations des images (voir pixels.ts)
   boutons: readonly Bouton[]
   cache: number | null // part de la dernière demande lue dans le cache, en %
+  expliquerCache?: () => void // clic sur le cache : une notification l'explique
   fermer?: () => void // croix « Fermer » : retire les barres /fil une fois le travail fini
   fermerAutre?: (id: string) => void // croix d'une autre discussion finie : retire sa ligne
   reglage?: ActionsReglage // ligne « Pupitre : ✓ Jauge ✓ Fil … », dépliée par le bouton « Réglages »
@@ -206,7 +209,7 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
     ...lignes.map((l, i) => rang(T, surface, colonnes, depuisLigne(l, i === 0 ? fermer : undefined), s.maintenant)),
     ...autres.map(a => rang(T, surface, colonnes, depuisAutre(a, s.fermerAutre), s.maintenant)),
     s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.maintenant) : null,
-    jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons, s.reglages.jauge ? s.cache : null) : null,
+    jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons, s.reglages.jauge ? s.cache : null, s.expliquerCache) : null,
     jauge && s.reglage?.ouvert ? dessinerReglages(T, s.reglages, s.reglage) : null,
   ].filter(r => r !== null)
   if (rangs.length === 1) return rangs[0]

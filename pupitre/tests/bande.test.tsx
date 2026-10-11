@@ -349,12 +349,16 @@ test('un sous-agent fini reste affiché jusqu à la croix, même pendant que Cla
   await ui.unmount()
 })
 
-test('cache : la part de la dernière demande lue dans le cache, sous la jauge', async ($, on) => {
+test('cache : la part de la dernière demande lue dans le cache, sous la jauge, et un clic l explique', async ($, on) => {
+  const toasts: string[] = []
+  on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
   await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
   await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', usage: { model: 'm', input_tokens: 10, cache_read_input_tokens: 82, cache_creation_input_tokens: 8, output_tokens: 5 } } as never)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   expect(JSON.stringify(await ui.drawn())).toContain('Cache 82 %')
+  await ui.press({ key: 'cache' })
+  expect(toasts.some(t => t.includes('82 %') && t.includes('déjà en mémoire'))).toBe(true)
   await ui.unmount()
 })
 
