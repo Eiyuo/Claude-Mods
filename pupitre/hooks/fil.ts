@@ -123,3 +123,9 @@ export function ligneDe(id: string, qui: string, s: Suivi, maintenant: number, p
     finiLe: fini ? (p?.finiLe ?? maintenant) : null,
   }
 }
+
+// Après un rechargement du mod (suivis repart à vide) : les barres finies restent affichées avec leur croix,
+// les barres en cours, qu'on ne peut plus suivre, partent.
+export function lignesGardees(lignes: readonly LigneFil[]): LigneFil[] {
+  return lignes.filter(l => l.fini)
+}

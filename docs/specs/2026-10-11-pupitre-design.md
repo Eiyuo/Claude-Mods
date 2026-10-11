@@ -213,8 +213,8 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 
 ### 9.4 Fin et son
 
-- **Fin.** Quand la réponse se termine, tout passe au vert et reste affiché. Une croix « × » (`Button` au texte « × », `label` « Fermer » comme nom accessible, cadre de bouton standard pour la zone cliquable ; pas `role: 'dismiss'`, qui fermerait toute la bande), au bout de la première ligne, retire les barres /fil ; sinon elles sont remplacées à la demande suivante (demande du 11/10/2026).
-- **Rechargement.** Au démarrage de la session (ou au rechargement du mod), les lignes /fil sont vidées : aucune barre ne reste figée.
+- **Fin.** Quand la réponse se termine, tout passe au vert et reste affiché. Une croix, au bout de la première ligne, retire les barres /fil : `Button` `role: 'dismiss'` (le bureau ne dessine pas le contenu d'un `Button`, seulement son `label` ; avec ce rôle il dessine sa croix de fermeture native, `label` « Fermer » comme nom accessible), contenu « × » pour le terminal ; sinon elles sont remplacées à la demande suivante (demande du 11/10/2026).
+- **Rechargement.** Au démarrage de la session (ou au rechargement du mod), les lignes /fil en cours sont retirées (on ne peut plus les suivre) ; les lignes finies restent, avec leur croix.
 - **Son.** Le carillon `assets/carillon.wav` est joué si la réponse a duré plus de 30 s. C'est un carillon doux de 2 notes (mi puis la, environ 0,6 s, sons sinusoïdaux qui s'atténuent), fabriqué par `outils/carillon.py`. Rien n'est téléchargé.
 
 ## 10. /cap, /relais, /plume

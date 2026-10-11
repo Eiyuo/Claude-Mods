@@ -5,7 +5,7 @@ import type { Autre, LigneFil, Mesures, Plume, Reglages } from '../types'
 import { AUCUN, basculer, jaugeVisible, lireReglages, type Commande } from './reglages'
 import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
-import { appliquerAppel, debutTour, etape, finir, ligneDe, nouveauSuivi, type Suivi } from './fil'
+import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
 import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, DEMANDE_CAP, DEMANDE_RELAIS, REPRISE_RELAIS, SYSTEME_PLUME, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, autresActives, ficheDe, lireFiche, nomFichier, titreDe, type Fiche } from './partage'
 
@@ -145,7 +145,7 @@ export const register: Register = on => {
     await $.command.register({ name: 'cap', description: 'Claude te pose ses questions pour fixer la suite' })
     const garde = lireReglages(await $.store.get('reglages'))
     await update($, reglagesA, () => garde)
-    await update($, lignesA, () => []) // suivis repart à vide (nouvelle session ou mod rechargé) : pas de barre orpheline
+    await update($, lignesA, l => lignesGardees(l)) // suivis repart à vide : seules les barres finies (et leur croix) restent
 
     const u = await $.session.usage()
     derniereUsage = { context: u.context, rateLimits: u.rateLimits }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { appliquerAppel, debutTour, estimation, etape, finir, ligneDe, motEtape, nouveauSuivi, vue } from '../hooks/fil'
+import { appliquerAppel, debutTour, estimation, etape, finir, ligneDe, lignesGardees, motEtape, nouveauSuivi, vue } from '../hooks/fil'
 
 describe('mots d étape', () => {
   test('outils connus, connecteurs, navigateur, inconnu', async () => {
@@ -123,4 +123,12 @@ describe('lignes', () => {
     const l2 = ligneDe('claude', 'Claude', finir(s, 10), 20, l1)
     expect(l2.eclat).toBe(false)
   })
+})
+
+test('au rechargement du mod, les barres finies restent (avec leur croix), les barres en cours partent', async () => {
+  const s = nouveauSuivi(0)
+  const enCours = ligneDe('a1', 'Sous-agent 1', s, 1000, undefined)
+  const finie = ligneDe('claude', 'Claude', finir(s, 2000), 2000, undefined)
+  expect(lignesGardees([finie, enCours]).map(l => l.id)).toEqual(['claude'])
+  expect(lignesGardees([])).toEqual([])
 })
