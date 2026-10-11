@@ -208,6 +208,7 @@ export const register: Register = on => {
     await $.command.register({ name: 'cap', description: DESCRIPTIONS.cap })
     await charger($)
     await update($, lignesA, l => lignesGardees(l)) // suivis repart à vide : seules les barres finies (et leur croix) restent
+    $.ui.invalidate('ui.render') // mod rechargé : la bande se redessine tout de suite, sans attendre un changement
 
     $.clock.every(30_000, () => {
       void (async () => {
@@ -286,7 +287,10 @@ export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     if (!tourEnCours) {
       tourEnCours = true
-      if (e.text.trim()) demandeTour = e.text.trim().split('\n')[0]!
+      // la demande d'un mod commence par « The <mod> plugin sent a message: » : le titre est la ligne d'après
+      const lignes = e.text.split('\n').map(l => l.trim()).filter(Boolean)
+      const titre = /plugin sent a message:$/.test(lignes[0] ?? '') ? lignes[1] : lignes[0]
+      if (titre) demandeTour = titre
       if ((await read($, reglagesA)).fil) {
         const maintenant = await $.clock.now()
         suivis.set('claude', debutTour(suivis.get('claude') ?? nouveauSuivi(maintenant), maintenant))

@@ -293,6 +293,16 @@ test('une ligne par travail : la demande en titre, le pourcentage, et toutes les
   }
 })
 
+test('une demande envoyée par un mod : le titre est sa demande, pas la phrase que le moteur ajoute devant', async ($, on) => {
+  await preparer($, on)
+  await $.turn.start({ text: 'The pupitre plugin sent a message:\nPasser le relais. Écris le fichier relais.md', turnId: 't1' } as never)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE })
+  const texte = JSON.stringify(await ui.drawn())
+  expect(texte).toContain('Passer le relais. Écris')
+  expect(texte).not.toContain('plugin sent a message')
+  await ui.unmount()
+})
+
 test('un sous-agent fini reste affiché jusqu à la croix, même pendant que Claude travaille', async ($, on) => {
   const horloge = await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
