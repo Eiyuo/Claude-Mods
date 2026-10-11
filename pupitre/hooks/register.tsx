@@ -7,6 +7,7 @@ import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, nouveauSuivi, type Suivi } from './fil'
 import { CONSIGNE_FIL } from './textes'
+import { PERIME_MS, autresActives, ficheDe, lireFiche, nomFichier, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
 
@@ -91,6 +92,45 @@ export const register: Register = on => {
         if (lignes.some(l => !l.fini)) await majLignes($)
       })()
     })
+
+    // Partage avec les autres discussions du PC : chaque session écrit sa fiche et lit celles des autres.
+    const maison = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')) ?? ''
+    const dossier = `${maison}/.claude/pupitre/sessions`
+    const moi = await $.session.id()
+    const titre = titreDe(await $.session.cwd())
+    let dernierEcrit = ''
+    let derniereEcriture = 0
+    $.clock.every(2000, () => {
+      void (async () => {
+        if (!maison || !(await read($, reglagesA)).fil) return
+        const maintenant = await $.clock.now()
+        const claude = (await read($, lignesA)).find(l => l.id === 'claude')
+        const f = ficheDe(moi, titre, claude, maintenant)
+        const texte = JSON.stringify({ ...f, majLe: 0 })
+        // écrire si quelque chose a changé, ou toutes les 6 s tant que la session travaille (signe de vie)
+        if (texte !== dernierEcrit || (f.actif && maintenant - derniereEcriture >= 6000)) {
+          try { await $.fs.write(`${dossier}/${nomFichier(moi)}`, JSON.stringify(f)); dernierEcrit = texte; derniereEcriture = maintenant } catch { /* disque indisponible : on réessaiera */ }
+        }
+        let entrees: { name: string; mtimeMs: number }[] = []
+        try { entrees = await $.fs.list(dossier) } catch { return }
+        const fiches: (Fiche | null)[] = []
+        for (const en of entrees.filter(x => x.name.endsWith('.json') && x.name !== nomFichier(moi) && maintenant - x.mtimeMs <= PERIME_MS).slice(0, 20)) {
+          try { fiches.push(lireFiche(String(await $.fs.read(`${dossier}/${en.name}`)))) } catch { fiches.push(null) }
+        }
+        const autres = autresActives(fiches, moi, maintenant)
+        const avant = await read($, autresA)
+        if (JSON.stringify(avant) !== JSON.stringify(autres)) await update($, autresA, () => autres)
+      })()
+    })
+    return next(e)
+  })
+
+  on('session.end', async ($, e, next) => {
+    try {
+      const maison = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')) ?? ''
+      const moi = await $.session.id()
+      if (maison) await $.fs.write(`${maison}/.claude/pupitre/sessions/${nomFichier(moi)}`, JSON.stringify(ficheDe(moi, '', undefined, await $.clock.now())))
+    } catch { /* rien à faire */ }
     return next(e)
   })
 

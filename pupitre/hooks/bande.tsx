@@ -1,5 +1,5 @@
 import type { Autre, LigneFil, Mesure, Mesures, Reglages } from '../types'
-import { PALETTES_JAUGE, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
+import { PALETTES_FIL, PALETTES_JAUGE, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
 import { formatPct } from './jauge'
 import { chrono } from './textes'
 import { jaugeVisible } from './reglages'
@@ -84,7 +84,25 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   )
 }
 
-// Rempli à la tâche 6. Jusque-là, elle ne dessine rien.
-export function dessinerAutres(_T: Elements, _surface: string, _colonnes: number, _autres: readonly Autre[], _maintenant: number) {
-  return null
+export function dessinerAutres(T: Elements, surface: string, colonnes: number, autres: readonly Autre[], maintenant: number) {
+  const { Box, Text, Svg } = T
+  const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4)
+  return (
+    <Box flexDirection="column">
+      <Text dimColor>Autres discussions en cours</Text>
+      {autres.map(a => (
+        <Box key={`a-${a.id}`} flexDirection="row" gap={1} alignItems="flex-end">
+          <Box width={COL_QUI}><Text wrap="truncate">{a.titre}</Text></Box>
+          <Box flexDirection="column" flexGrow={1}>
+            <Text dimColor wrap="truncate">{a.tache}</Text>
+            {surface === 'terminal' || Svg === undefined
+              ? <Text dimColor>{barreTexte(a.progression, largeur)}</Text>
+              : <Svg source={svgSimple({ largeur: largeur * PX_COL, hauteur: 10, cellule: 2, rayon: 4, progression: a.progression, palette: PALETTES_FIL[a.niveau]!, graine: graineDe(a.id), majLe: a.majLe })} alt={`${a.titre} : ${a.tache}`} isInteractive />}
+          </Box>
+          <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{a.compteur}</Text></Box>
+          <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono(maintenant - a.debut)}</Text></Box>
+        </Box>
+      ))}
+    </Box>
+  )
 }
