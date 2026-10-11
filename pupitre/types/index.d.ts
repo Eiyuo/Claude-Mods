@@ -19,6 +19,7 @@ declare module 'claude-code' {
       autres: Autre[]
       maintenant: number
       plume: Plume
+      reglagesOuverts: boolean
     }
   }
 }

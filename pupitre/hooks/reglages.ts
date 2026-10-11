@@ -34,6 +34,7 @@ export function basculer(r: Reglages, c: Commande): { reglages: Reglages; messag
   return { reglages: { ...r, [c]: allume }, message: `Pupitre : ${nom} ${allume ? oui : non}` }
 }
 
+// La ligne du bas porte la jauge, les boutons et « Réglages » : elle reste là tant qu'une fonction est allumée.
 export function jaugeVisible(r: Reglages): boolean {
-  return r.jauge || r.relais || r.plume
+  return r.jauge || r.fil || r.relais || r.plume
 }

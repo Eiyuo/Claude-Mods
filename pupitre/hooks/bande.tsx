@@ -2,7 +2,7 @@ import type { Autre, LigneFil, Mesure, Mesures, Reglages } from '../types'
 import { PALETTES_FIL, PALETTES_JAUGE, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
 import { formatPct } from './jauge'
 import { chrono } from './textes'
-import { jaugeVisible } from './reglages'
+import { jaugeVisible, toutAllume, type Commande } from './reglages'
 
 export const PX_COL = 8 // pixels par colonne de la bande sur l'application (à confirmer, tâche 11)
 
@@ -56,7 +56,7 @@ export function dessinerJauge(T: Elements, surface: string, colonnes: number, me
   const liste: [string, Mesure][] = montrerMesures ? [['Contexte', mesures.contexte], ['Limite 5 h', mesures.cinqH], ['Limite 7 jours', mesures.septJ]] : []
   const { barre, avecCourt } = dispositionJauge(colonnes, liste.map(([nom, m]) => ({ nom, pct: formatPct(m.pct), court: m.court ?? '' })), placeBoutons, parCar)
   return (
-    <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={ECART}>
+    <Box flexDirection="row" alignItems="center" justifyContent={liste.length > 0 ? 'space-between' : 'flex-end'} gap={ECART}>
       {liste.length > 0 ? <Box flexDirection="row" alignItems="center" gap={ECART}>{liste.map(([nom, m]) => mesure(T, surface, nom, m, barre, avecCourt, majLe))}</Box> : null}
       {boutons.length > 0 ? <Box flexDirection="row" alignItems="center" gap={1}>{boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}</Box> : null}
     </Box>
@@ -67,6 +67,22 @@ export type EtatBande = {
   reglages: Reglages; mesures: Mesures; lignes: readonly LigneFil[]; autres: readonly Autre[]
   maintenant: number; boutons: readonly Bouton[]; majJauge: number
   fermer?: () => void // « Fermer » : retire les barres /fil une fois le travail fini
+  reglage?: ActionsReglage // ligne « Pupitre : ✓ Jauge ✓ Fil … », dépliée par le bouton « Réglages »
+}
+
+export type ActionsReglage = { ouvert: boolean; basculer: (c: Commande) => void; replier: () => void }
+const FONCTIONS: readonly [Exclude<Commande, 'pupitre'>, string][] = [['jauge', 'Jauge'], ['fil', 'Fil'], ['relais', 'Relais'], ['plume', 'Plume']]
+
+export function dessinerReglages(T: Elements, r: Reglages, a: ActionsReglage) {
+  const { Box, Text, Button } = T
+  return (
+    <Box flexDirection="row" alignItems="center" gap={1}>
+      <Text dimColor>Pupitre :</Text>
+      {FONCTIONS.map(([c, nom]) => <Button key={`basculer-${c}`} label={`${r[c] ? '✓' : '○'} ${nom}`} onPress={() => a.basculer(c)} />)}
+      <Button key="tout" label={toutAllume(r) ? 'Tout éteindre' : 'Tout allumer'} onPress={() => a.basculer('pupitre')} />
+      <Button key="replier" label="Replier" onPress={() => a.replier()} />
+    </Box>
+  )
 }
 
 const COL_QUI = 14, COL_COMPTEUR = 8, COL_CHRONO = 8, COL_FERMER = 10
@@ -100,12 +116,14 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   const autres = s.reglages.fil ? s.autres : []
   if (!jauge && lignes.length === 0 && autres.length === 0) return null
   const barreJauge = jauge ? dessinerJauge(T, surface, colonnes, s.mesures, s.reglages.jauge && maxRows >= 3, s.boutons, s.majJauge) : null
-  if (lignes.length === 0 && autres.length === 0) return barreJauge // au repos : une seule ligne
+  const ligneReglages = jauge && s.reglage?.ouvert ? dessinerReglages(T, s.reglages, s.reglage) : null
+  if (!ligneReglages && lignes.length === 0 && autres.length === 0) return barreJauge // au repos : une seule ligne
   // « Fermer » sur la première ligne, une fois que tout est fini
   const fermer = s.fermer && lignes.length > 0 && lignes.every(l => l.fini) ? s.fermer : undefined
-  // de haut en bas : autres discussions, /fil, puis la jauge, toujours au plus près de la zone de texte
+  // de haut en bas : réglages dépliés, autres discussions, /fil, puis la jauge, toujours au plus près de la zone de texte
   return (
     <Box flexDirection="column" gap={1}>
+      {ligneReglages}
       {autres.length > 0 ? dessinerAutres(T, surface, colonnes, autres, s.maintenant) : null}
       {lignes.map((l, i) => ligne(T, surface, colonnes, l, s.maintenant, i === 0 ? fermer : undefined))}
       {barreJauge}

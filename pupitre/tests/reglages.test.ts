@@ -37,5 +37,6 @@ describe('réglages', () => {
     expect(jaugeVisible({ ...AUCUN, relais: true })).toBe(true)
     expect(jaugeVisible({ ...AUCUN, plume: true })).toBe(true)
     expect(jaugeVisible({ ...AUCUN, jauge: true })).toBe(true)
+    expect(jaugeVisible({ ...AUCUN, fil: true })).toBe(true) // le bouton « Réglages » doit rester accessible
   })
 })

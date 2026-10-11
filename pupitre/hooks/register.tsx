@@ -1,8 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Autre, LigneFil, Mesures, Plume } from '../types'
-import { AUCUN, basculer, lireReglages, type Commande } from './reglages'
+import type { Autre, LigneFil, Mesures, Plume, Reglages } from '../types'
+import { AUCUN, basculer, jaugeVisible, lireReglages, type Commande } from './reglages'
 import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, nouveauSuivi, type Suivi } from './fil'
@@ -18,6 +18,7 @@ export const lignesA = atom({ plugin: 'pupitre', key: 'lignes' } as const, [] as
 export const autresA = atom({ plugin: 'pupitre', key: 'autres' } as const, [] as Autre[])
 export const maintenantA = atom({ plugin: 'pupitre', key: 'maintenant' } as const, 0)
 export const plumeA = atom({ plugin: 'pupitre', key: 'plume' } as const, { original: null, jusqua: 0, enCours: false } as Plume)
+export const ouvertA = atom({ plugin: 'pupitre', key: 'reglagesOuverts' } as const, false)
 
 let derniereUsage: UsageLu | null = null
 
@@ -111,12 +112,26 @@ const DESCRIPTIONS: Record<Commande, string> = {
   plume: 'Allume ou éteint le bouton « Améliorer le prompt »',
 }
 
+async function appliquer($: Dollar, c: Commande): Promise<{ reglages: Reglages; message: string }> {
+  const r = basculer(await read($, reglagesA), c)
+  await update($, reglagesA, () => r.reglages)
+  await $.store.set('reglages', r.reglages)
+  return r
+}
+
 async function bascule($: Dollar, c: Commande) {
-  const { reglages, message } = basculer(await read($, reglagesA), c)
-  await update($, reglagesA, () => reglages)
-  await $.store.set('reglages', reglages)
+  const { message } = await appliquer($, c)
   $.ui.toast(message)
   return { text: message }
+}
+
+// Bouton de la ligne « Réglages » : le libellé ✓ / ○ suffit ; un message seulement quand la bande s'en va.
+async function boutonReglage($: Dollar, c: Commande): Promise<void> {
+  const { reglages } = await appliquer($, c)
+  if (!jaugeVisible(reglages)) {
+    await update($, ouvertA, () => false)
+    $.ui.toast('Pupitre : tout est éteint. Tape /pupitre pour le rallumer.')
+  }
 }
 
 export const register: Register = on => {
@@ -300,6 +315,7 @@ export const register: Register = on => {
       if (plume.original !== null) boutons.push({ cle: 'revenir', libelle: 'Revenir à mon texte', action: () => { void revenir($) } })
       else boutons.push({ cle: 'plume', libelle: plume.enCours ? 'Amélioration…' : 'Améliorer le prompt', action: () => { void ameliorer($) } })
     }
+    boutons.push({ cle: 'reglages', libelle: 'Réglages', action: () => { void update($, ouvertA, o => !o) } })
     const arbre = dessinerBande(T, e.surface, e.props.bodyColumns, e.props.maxRows, {
       reglages: r,
       mesures: await read($, mesuresA),
@@ -309,6 +325,11 @@ export const register: Register = on => {
       boutons,
       majJauge: 0,
       fermer: () => { void fermerFil($) },
+      reglage: {
+        ouvert: await read($, ouvertA),
+        basculer: c => { void boutonReglage($, c) },
+        replier: () => { void update($, ouvertA, () => false) },
+      },
     })
     return arbre === null ? next(e) : (arbre as never)
   })

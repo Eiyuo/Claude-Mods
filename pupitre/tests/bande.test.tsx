@@ -72,6 +72,7 @@ async function preparer($: any, on: any) {
   on('tool.call', async () => ({ result: { text: 'contenu' } }) as never)
   on('turn.start', async () => ({ turnId: 't1' }))
   on('turn.complete', async () => ({ text: '' }))
+  on('ui.render', async () => ({ type: 'Text', props: {}, children: ['(bande du moteur)'] }) as never) // ce que le moteur dessine quand le mod passe la main
   await $.command.run({ command: 'pupitre', args: '' })
   return horloge
 }
@@ -118,5 +119,54 @@ test('aucune barre en cadre interactif : un cadre se recharge à chaque changeme
   const svgs = await ui.findAll({ type: 'Svg' })
   expect(svgs.length).toBe(4)
   for (const s of svgs) expect(s.props.isInteractive ?? false).toBe(false)
+  await ui.unmount()
+})
+
+const libelles = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
+  (await ui.findAll({ type: 'Button' })).map(b => String(b.props.label))
+
+test('« Réglages » déplie une ligne avec un bouton par fonction, puis se replie', async ($, on) => {
+  await preparer($, on)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
+    expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
+    await ui.press({ key: 'reglages' })
+    const ouverts = await libelles(ui)
+    for (const l of ['✓ Jauge', '✓ Fil', '✓ Relais', '✓ Plume', 'Tout éteindre', 'Replier']) expect(ouverts).toContain(l)
+    await ui.press({ key: 'replier' })
+    expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
+    await ui.unmount()
+  }
+})
+
+test('un bouton de réglage éteint puis rallume sa fonction', async ($, on) => {
+  await preparer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'reglages' })
+  await ui.press({ key: 'basculer-jauge' })
+  expect(await libelles(ui)).toContain('○ Jauge')
+  expect(await libelles(ui)).toContain('Tout allumer')
+  expect(JSON.stringify(await ui.drawn())).not.toContain('Contexte')
+  await ui.press({ key: 'basculer-relais' })
+  expect(await libelles(ui)).not.toContain('Passer le relais')
+  await ui.press({ key: 'basculer-jauge' })
+  expect(JSON.stringify(await ui.drawn())).toContain('Contexte')
+  await ui.unmount()
+})
+
+test('« Réglages » reste accessible quand seul le fil est allumé', async ($, on) => {
+  await preparer($, on)
+  for (const command of ['jauge', 'relais', 'plume']) await $.command.run({ command, args: '' })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(await libelles(ui)).toEqual(['Réglages'])
+  await ui.unmount()
+})
+
+test('« Tout éteindre » retire la bande', async ($, on) => {
+  await preparer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'reglages' })
+  await ui.press({ key: 'tout' })
+  expect(await ui.find({ type: 'Button', text: 'Réglages' })).toBeUndefined()
   await ui.unmount()
 })
