@@ -239,16 +239,18 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 
 ### /plume (bouton « Améliorer le prompt »)
 1. **Lecture du brouillon** (`$.prompt.read()`). S'il est vide : « Écris d'abord ta demande. »
-2. **Inventaire.** Le mod liste les skills et commandes (`$.command.list()`), les outils et connecteurs (`$.tool.list()`) et les sous-agents (`$.agent.list()`), avec nom et description.
-3. **Réécriture.** Le brouillon est envoyé à `$.model.complete` (modèle `sonnet`, sinon le modèle de la session), avec ces consignes :
-   - garder la langue et l'intention ;
+2. **Inventaire.** Le mod liste les skills et commandes (`$.command.list()`), les outils et connecteurs (`$.tool.list()`) et les sous-agents (`$.agent.list()`), avec nom et description. Ceux dont le nom ou la description reprend des mots de la demande (5 lettres et plus) passent en tête, avant la coupe à 150.
+3. **Contexte récent** (`$.session.messages()`, `$.session.root()`) : le nom du dossier, la dernière demande (600 caractères au plus) et la fin de la dernière réponse de Claude (1 200 caractères au plus), sans les consignes jointes par les mods (`<system-reminder>`). Sans conversation lisible, la réécriture se fait sur la demande seule.
+4. **Réécriture.** Le tout est envoyé à `$.model.complete` (modèle `sonnet`, sinon le modèle de la session), avec ces consignes :
+   - garder la langue et l'intention, et mot pour mot les contraintes, noms, chiffres et citations ;
    - rendre la demande précise : but, contexte, contraintes, résultat attendu ;
-   - ne rien inventer ;
+   - ne rien inventer ; ne se servir du contexte récent que pour préciser ce que désignent « ça », « les barres », « ce fichier »… ;
+   - si un point essentiel reste ambigu, ajouter une phrase qui demande à Claude de poser la question avant d'agir ;
+   - garder à peu près la même longueur (2 ou 3 phrases de plus au plus pour une demande de quelques mots) ;
    - citer les skills, commandes, connecteurs ou sous-agents utiles, par leur nom exact et seulement s'ils servent ;
-   - rester court ;
    - répondre uniquement par le texte réécrit.
-4. **Remplacement** (`$.prompt.fill`, mode `replace`). Le texte d'origine est gardé 30 s derrière le bouton « Revenir à mon texte ».
-5. **Erreur.** Si l'appel échoue, le brouillon reste intact et le message « Amélioration impossible : réessaie » s'affiche.
+5. **Remplacement** (`$.prompt.fill`, mode `replace`). Le texte d'origine reste derrière le bouton « Revenir à mon texte » jusqu'à l'envoi (crochet `prompt.submit`), même si on retouche la réécriture.
+6. **Erreur.** Si l'appel échoue, le brouillon reste intact et le message « Amélioration impossible : réessaie » s'affiche.
 
 ## 10 bis. Évolutions du 11/10 (après la vidéo d'inspiration)
 

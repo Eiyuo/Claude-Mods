@@ -51,18 +51,38 @@ export type Capacite = { sorte: 'commande' | 'outil' | 'connecteur' | 'sous-agen
 
 export const SYSTEME_PLUME =
   "Tu réécris la demande qu'un utilisateur s'apprête à envoyer à Claude Code, pour qu'elle soit précise et complète. " +
-  "Règles : garde sa langue et son intention ; n'invente aucun fait, aucun fichier, aucune contrainte ; rends explicites " +
-  "le but, le contexte utile, les contraintes et le résultat attendu ; si un outil, une commande, un connecteur ou un " +
-  "sous-agent de la liste fournie sert vraiment, cite-le par son nom exact (une commande s'écrit avec « / ») ; reste court " +
-  "et direct, en tutoyant ; réponds uniquement par le texte réécrit, sans titre, sans guillemets, sans commentaire."
+  "Règles : garde sa langue et son intention ; garde mot pour mot ses contraintes, noms, chiffres et citations ; n'invente " +
+  "aucun fait, aucun fichier, aucune contrainte ; rends explicites le but, le contexte utile, les contraintes et le résultat " +
+  "attendu ; sers-toi du contexte récent de la conversation seulement pour préciser ce que désignent « ça », « les barres », " +
+  "« ce fichier »…, sans reprendre d'autres sujets ; si un point essentiel reste ambigu, ne devine pas : ajoute une phrase " +
+  "qui demande à Claude de poser la question avant d'agir ; garde à peu près la même longueur (une demande de quelques mots " +
+  "peut gagner 2 ou 3 phrases, pas plus) ; si un outil, une commande, un connecteur ou un sous-agent de la liste fournie sert " +
+  "vraiment, cite-le par son nom exact (une commande s'écrit avec « / ») ; reste direct, en tutoyant ; réponds uniquement " +
+  "par le texte réécrit, sans titre, sans guillemets, sans commentaire."
 
 const MAX_CAPACITES = 150
+const MAX_DEMANDE = 600
+const MAX_REPONSE = 1200
 
-export function promptPlume(brouillon: string, capacites: readonly Capacite[]): string {
-  const liste = capacites.slice(0, MAX_CAPACITES)
-    .map(c => `- ${c.sorte} ${c.sorte === 'commande' ? '/' : ''}${c.nom} : ${c.description.replace(/\s+/g, ' ').slice(0, 140)}`)
+// Le dossier, la dernière demande et la fin de la dernière réponse (là où Claude conclut ou pose sa question), sans les
+// consignes jointes par les mods.
+export function contexteRecent(messages: readonly { role: string; text: string }[], dossier: string): string {
+  const propre = (t: string) => t.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '').trim()
+  const dernier = (role: string) => [...messages].reverse().map(m => (m.role === role ? propre(m.text) : '')).find(Boolean) ?? ''
+  const demande = dernier('user').slice(0, MAX_DEMANDE)
+  const reponse = dernier('assistant').slice(-MAX_REPONSE)
+  return [`Dossier du projet : ${dossier}`, demande && `Dernière demande de l'utilisateur : ${demande}`,
+    reponse && `Fin de la dernière réponse de Claude : ${reponse}`].filter(Boolean).join('\n')
+}
+
+// La liste est coupée à MAX_CAPACITES : celles dont le nom ou la description reprend des mots de la demande passent en tête.
+export function promptPlume(brouillon: string, capacites: readonly Capacite[], contexte = ''): string {
+  const mots = [...new Set(brouillon.toLowerCase().match(/[\p{L}\d]{5,}/gu) ?? [])]
+  const pertinence = (c: Capacite) => { const t = `${c.nom} ${c.description}`.toLowerCase(); return mots.filter(m => t.includes(m)).length }
+  const liste = capacites.map((c, i) => ({ c, s: pertinence(c), i })).sort((a, b) => b.s - a.s || a.i - b.i).slice(0, MAX_CAPACITES)
+    .map(({ c }) => `- ${c.sorte} ${c.sorte === 'commande' ? '/' : ''}${c.nom} : ${c.description.replace(/\s+/g, ' ').slice(0, 140)}`)
     .join('\n')
-  return `Ce dont Claude dispose dans cette session :\n${liste}\n\nDemande à réécrire :\n<<<\n${brouillon}\n>>>`
+  return `${contexte ? `Contexte récent de la conversation :\n${contexte}\n\n` : ''}Ce dont Claude dispose dans cette session :\n${liste}\n\nDemande à réécrire :\n<<<\n${brouillon}\n>>>`
 }
 
 export function nettoyerReponse(texte: string): string {

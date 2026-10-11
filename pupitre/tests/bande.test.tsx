@@ -408,6 +408,26 @@ test('carillon : sous Windows, c est PowerShell qui joue le son du mod (le moteu
   expect(lances[0]).toContain('assets/carillon.wav')
 })
 
+test('« Améliorer le prompt » : réécrit avec la conversation, et « Revenir à mon texte » reste jusqu à l envoi', async ($, on) => {
+  const demandes: string[] = []
+  let boite = 'refais-les plus jolies'
+  on('prompt.read', async () => ({ value: { text: boite, cursor: boite.length } }) as never)
+  on('prompt.fill', async ($, e) => { boite = e.text; return { isFilled: true } as never })
+  on('session.messages', async () => ({ value: [{ role: 'user', text: 'parle-moi des barres', toolUses: [] }, { role: 'assistant', text: 'Voici les barres du fil.', toolUses: [] }] }) as never)
+  on('model.complete', async ($, e) => { demandes.push(e.prompt); return { value: { isAnswered: true, text: 'Rends les barres du fil plus jolies.', usage: {} } } as never })
+  on('prompt.submit', async ($, e) => ({ text: e.text }) as never)
+  const horloge = await preparer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'plume' })
+  expect(demandes[0]).toContain('Voici les barres du fil.')
+  expect(boite).toBe('Rends les barres du fil plus jolies.')
+  await horloge.advance(120_000) // le temps de relire : le retour reste possible
+  expect(await libelles(ui)).toContain('Revenir à mon texte')
+  await $.prompt.submit({ text: boite })
+  expect(await libelles(ui)).toContain('Améliorer le prompt')
+  await ui.unmount()
+})
+
 const libelles = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
   (await ui.findAll({ type: 'Button' })).map(b => String(b.props.label))
 

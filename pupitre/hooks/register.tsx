@@ -6,7 +6,7 @@ import { AUCUN, basculer, changerSeuil, jaugeVisible, lireRelais, lireReglages, 
 import { MESURES_VIDES, lireMesures, pourcentageCache, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
+import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
@@ -17,7 +17,7 @@ export const mesuresA = atom({ plugin: 'pupitre', key: 'mesures' } as const, MES
 export const lignesA = atom({ plugin: 'pupitre', key: 'lignes' } as const, [] as LigneFil[])
 export const autresA = atom({ plugin: 'pupitre', key: 'autres' } as const, [] as Autre[])
 export const maintenantA = atom({ plugin: 'pupitre', key: 'maintenant' } as const, 0)
-export const plumeA = atom({ plugin: 'pupitre', key: 'plume' } as const, { original: null, jusqua: 0, enCours: false } as Plume)
+export const plumeA = atom({ plugin: 'pupitre', key: 'plume' } as const, { original: null, enCours: false } as Plume)
 export const ouvertA = atom({ plugin: 'pupitre', key: 'reglagesOuverts' } as const, false)
 export const chargeA = atom({ plugin: 'pupitre', key: 'charge' } as const, false)
 export const relaisA = atom({ plugin: 'pupitre', key: 'relais' } as const, lireRelais(undefined) as ReglageRelais)
@@ -123,16 +123,18 @@ async function ameliorer($: Dollar): Promise<void> {
   if (!brouillon.trim()) { $.ui.toast("Écris d'abord ta demande."); return }
   await update($, plumeA, p => ({ ...p, enCours: true }))
   try {
-    const demande = { system: SYSTEME_PLUME, prompt: promptPlume(brouillon, await capacites($)), maxTokens: 2000, timeoutMs: 60_000 }
+    let dossier = ''
+    try { dossier = (await $.session.root()).split(/[\\/]/).pop() ?? '' } catch { /* dossier inconnu */ }
+    let contexte = contexteRecent([], dossier)
+    try { contexte = contexteRecent(await $.session.messages(), dossier) } catch { /* conversation illisible : la demande seule */ }
+    const demande = { system: SYSTEME_PLUME, prompt: promptPlume(brouillon, await capacites($), contexte), maxTokens: 2000, timeoutMs: 60_000 }
     let r = await $.model.complete({ ...demande, model: 'sonnet' })
     if (!r.isAnswered && r.reason === 'api-error') r = await $.model.complete({ ...demande, model: await $.session.model() })
     const texte = r.isAnswered ? nettoyerReponse(r.text) : ''
     if (!texte) { $.ui.toast('Amélioration impossible : réessaie.'); return }
     const fait = await $.prompt.fill({ text: texte, mode: 'replace' })
     if (!fait.isFilled) { $.ui.toast("La zone de texte n'est pas disponible."); return }
-    const jusqua = (await $.clock.now()) + 30_000
-    await update($, plumeA, p => ({ ...p, original: brouillon, jusqua }))
-    $.clock.after(30_000, () => { void update($, plumeA, p => (p.jusqua === jusqua ? { ...p, original: null } : p)) })
+    await update($, plumeA, p => ({ ...p, original: brouillon })) // « Revenir à mon texte » jusqu'à l'envoi
   } finally {
     await update($, plumeA, p => ({ ...p, enCours: false }))
   }
@@ -287,6 +289,7 @@ export const register: Register = on => {
   // Cap automatique : la consigne part avec chacun de tes messages (le contexte d'un message de l'utilisateur arrive à
   // Claude ; ceux du mod lui-même, non, et une commande part telle quelle).
   on('prompt.submit', async ($, e, next) => {
+    if ((await read($, plumeA)).original !== null) await update($, plumeA, p => ({ ...p, original: null })) // envoyé : plus de retour
     if (next.origin.plugin === 'pupitre' || e.text.trimStart().startsWith('/') || !(await read($, reglagesA)).cap) return next(e)
     return next({ ...e, context: [...(e.context ?? []), CONSIGNE_CAP_AUTO] })
   })

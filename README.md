@@ -121,10 +121,11 @@ Si `relais.md` n'a pas pu être écrit, la conversation n'est pas vidée et un m
 
 Tape (ou dicte) ta demande comme elle te vient, puis clique sur **« Améliorer le prompt »** :
 
-1. Ta demande est réécrite pour être plus précise : le but, le contexte, les contraintes et le résultat attendu. Elle garde ta langue et ton intention, et rien n'est inventé.
-2. La réécriture s'appuie sur ce que Claude a sous la main (skills, commandes, connecteurs, sous-agents) et cite ceux qui serviront.
-3. Le texte amélioré remplace le tien dans la zone de texte. Relis-le, corrige si besoin, puis envoie.
-4. Pendant 30 secondes, le bouton **« Revenir à mon texte »** permet d'annuler.
+1. Ta demande est réécrite pour être plus précise : le but, le contexte, les contraintes et le résultat attendu. Elle garde ta langue, ton intention et tes contraintes mot pour mot, à peu près la même longueur, et rien n'est inventé. Si un point essentiel est ambigu, elle demande à Claude de te poser la question avant d'agir.
+2. La réécriture tient compte de la fin de la conversation (ta dernière demande, la dernière réponse de Claude) : « refais-les » ou « ce fichier » deviennent précis.
+3. Elle s'appuie sur ce que Claude a sous la main (skills, commandes, connecteurs, sous-agents), en commençant par ceux qui touchent à ta demande, et cite ceux qui serviront.
+4. Le texte amélioré remplace le tien dans la zone de texte. Relis-le, corrige si besoin, puis envoie.
+5. Jusqu'à l'envoi, le bouton **« Revenir à mon texte »** permet d'annuler, même après une retouche.
 
 ### Où ça marche
 

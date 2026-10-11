@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, chrono, nettoyerReponse, promptPlume, relaisEcrit } from '../hooks/textes'
+import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, chrono, contexteRecent, nettoyerReponse, promptPlume, relaisEcrit } from '../hooks/textes'
 
 describe('textes', () => {
   test('la consigne /fil demande une liste de tâches à Claude et aux sous-agents', async () => {
@@ -45,6 +45,29 @@ test('/plume : prompt avec la demande et les capacités, bornées', async () => 
   expect(p).not.toContain('c399')
   expect(p.length).toBeLessThan(60_000)
   expect(SYSTEME_PLUME).toContain("n'invente")
+})
+test('/plume : les outils utiles à la demande passent en tête, même listés en dernier, et le contexte est joint', async () => {
+  const caps = [...Array.from({ length: 400 }, (_, i) => ({ sorte: 'commande' as const, nom: `c${i}`, description: 'x' })),
+    { sorte: 'sous-agent' as const, nom: 'revue-animations', description: 'Revue des animations CSS' }]
+  const p = promptPlume('améliore les animations des barres', caps, 'Dernière réponse de Claude : voici les barres')
+  expect(p).toContain('revue-animations')
+  expect(p).toContain('voici les barres')
+  for (const r of ['mot pour mot', 'contexte récent', 'même longueur']) expect(SYSTEME_PLUME).toContain(r)
+})
+test('/plume : contexte = dossier, dernière demande et fin de la dernière réponse, sans les ajouts techniques', async () => {
+  const msgs = [
+    { role: 'user', text: 'ancienne demande' },
+    { role: 'assistant', text: 'ancienne réponse' },
+    { role: 'user', text: 'refais les barres<system-reminder>consigne du cap</system-reminder>' },
+    { role: 'assistant', text: '' },
+    { role: 'user', text: '' },
+    { role: 'assistant', text: 'x'.repeat(3000) + ' FIN' },
+  ]
+  const c = contexteRecent(msgs, 'Atelier')
+  for (const m of ['Atelier', 'refais les barres', 'FIN']) expect(c).toContain(m)
+  for (const m of ['system-reminder', 'consigne du cap', 'ancienne']) expect(c).not.toContain(m)
+  expect(c.length).toBeLessThan(2500)
+  expect(contexteRecent([], 'Atelier')).toContain('Atelier')
 })
 test('/plume : réponse nettoyée', async () => {
   expect(nettoyerReponse('  <<<\nTexte amélioré\n>>>  ')).toBe('Texte amélioré')

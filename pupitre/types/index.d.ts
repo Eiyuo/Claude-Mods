@@ -8,7 +8,7 @@ export type LigneFil = {
   fini: boolean; eclat: boolean; debut: number; majLe: number; finiLe: number | null
 }
 export type ReglageRelais = { seuil: number; auto: boolean } // seuil du contexte, en %, de 30 à 90
-export type Plume = { original: string | null; jusqua: number; enCours: boolean }
+export type Plume = { original: string | null; enCours: boolean } // original : ton texte d'avant, jusqu'à l'envoi
 export type Autre = { id: string; titre: string; tache: string; compteur: string; progression: number; niveau: Niveau; debut: number; majLe: number; finiLe: number | null; demande: string; mot: string }
 
 declare module 'claude-code' {
