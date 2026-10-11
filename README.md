@@ -6,6 +6,29 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 |---|---|---|
 | **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.1) |
 
+## Aperçu
+
+![La bande du pupitre : jauge, cache et boutons](docs/images/bande.png)
+
+La bande s'affiche au-dessus de la zone de texte. On y trouve la jauge (mémoire de la conversation, limites sur 5 heures et sur 7 jours), la part de la dernière demande lue dans le cache, et les boutons « Passer le relais », « Améliorer le prompt » et « Réglages ».
+
+**Les barres de travail** (`/fil`) : une par travail en cours. Elles changent de couleur en avançant, et l'étiquette donne l'étape en cours. Les images ci-dessous sont dessinées par le code du mod lui-même :
+
+<img src="docs/images/fil-1.svg" width="540" alt="Barre violette à 25 %, étape Lecture">
+
+<img src="docs/images/fil-2.svg" width="540" alt="Barre bleue à 50 %, étape Écriture">
+
+<img src="docs/images/fil-3.svg" width="540" alt="Barre turquoise à 80 %, étape Commande">
+
+<img src="docs/images/fil-4.svg" width="540" alt="Barre verte pleine : travail fini">
+
+**La jauge** passe du vert au rouge à mesure qu'elle se remplit :
+
+| Large | À surveiller | Ça presse | Critique |
+|---|---|---|---|
+| <img src="docs/images/jauge-vert.svg" width="160" alt="Jauge verte à 30 %"> | <img src="docs/images/jauge-jaune.svg" width="160" alt="Jauge jaune à 60 %"> | <img src="docs/images/jauge-orange.svg" width="160" alt="Jauge orange à 80 %"> | <img src="docs/images/jauge-rouge.svg" width="160" alt="Jauge rouge à 93 %, qui bat comme un cœur"> |
+| moins de 50 % | 50 à 75 % | 75 à 90 % | 90 % et plus |
+
 ## Installation
 
 À faire **une fois par ordinateur**. Il te faut Claude Code à jour et la commande `claude` dans un terminal (PowerShell sous Windows) : ces commandes ne se tapent pas dans l'onglet Code de l'application.
