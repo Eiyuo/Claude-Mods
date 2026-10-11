@@ -70,7 +70,7 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 
 **Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa propre ligne, avec la même barre. S'il finit pendant que Claude travaille encore, sa ligne disparaît 4 secondes après.
 
-**À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. La croix **×** au bout de la ligne de Claude (nommée « Fermer » pour les lecteurs d'écran) les retire. Sinon, elles sont remplacées à ta demande suivante.
+**À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. La croix **×** au bout de la ligne de Claude les retire. Sinon, elles sont remplacées à ta demande suivante.
 
 **Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît en haut de la bande sur une ligne fine, sous « Autres discussions en cours ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre.
 

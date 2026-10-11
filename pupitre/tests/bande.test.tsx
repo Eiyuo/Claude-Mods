@@ -156,11 +156,10 @@ test('travail fini : la barre reste, avec une croix « Fermer », jusqu à ce qu
   expect(avant).toContain('Sous-agent')
   const [x, ...autresCroix] = await croix()
   expect(autresCroix).toHaveLength(0)
-  expect(x!.props.label).toBe('Fermer') // nom accessible
-  // Le bureau ne dessine pas le contenu d'un Button, seulement son label : la croix y vient de role « dismiss »
-  // (sa croix de fermeture native, le label comme nom accessible) ; le terminal dessine le « × » du contenu.
-  expect(x!.props.role).toBe('dismiss')
-  expect(JSON.stringify(x)).toContain('×')
+  // Le bureau ne dessine d'un Button que son label (ni son contenu, ni role « dismiss » dans cette bande,
+  // vérifié sur capture) : la croix doit être le label lui-même.
+  expect(x!.props.label).toBe('×')
+  expect(x!.props.role).toBeUndefined()
   await ui.press({ key: 'fermer-fil' })
   const apres = JSON.stringify(await ui.drawn())
   expect(apres).not.toContain('Claude')

@@ -122,9 +122,9 @@ function ligne(T: Elements, surface: string, colonnes: number, l: LigneFil, main
       </Box>
       <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{l.compteur}</Text></Box>
       <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono(fin - l.debut)}</Text></Box>
-      {/* croix de fermeture : le bureau dessine sa croix native (role « dismiss »), « Fermer » en nom accessible ;
-          il ne dessine pas le contenu d'un Button. Le terminal, lui, dessine le « × » du contenu. */}
-      {fermer ? <Button key="fermer-fil" label="Fermer" role="dismiss" onPress={() => fermer()}>×</Button> : null}
+      {/* croix de fermeture : le bureau ne dessine d'un Button que son label (ni son contenu, ni role « dismiss »
+          dans cette bande, vérifié sur capture), donc la croix est le label ; le cadre du bouton garde la zone cliquable. */}
+      {fermer ? <Button key="fermer-fil" label="×" onPress={() => fermer()} /> : null}
     </Box>
   )
 }
