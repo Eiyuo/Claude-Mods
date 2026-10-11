@@ -1,4 +1,5 @@
-export type Niveau = 0 | 1 | 2 | 3
+import type { Niveau } from '../types'
+export type { Niveau } from '../types'
 
 export const PALETTES_FIL: readonly (readonly string[])[] = [
   ['#B2A6EE', '#9687E4', '#7C6CDC', '#6452D0'],
