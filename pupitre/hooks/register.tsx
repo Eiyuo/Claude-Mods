@@ -1,12 +1,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Autre, LigneFil, Mesures } from '../types'
+import type { Autre, LigneFil, Mesures, Plume } from '../types'
 import { AUCUN, basculer, lireReglages, type Commande } from './reglages'
 import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, DEMANDE_CAP, DEMANDE_RELAIS, REPRISE_RELAIS, relaisEcrit } from './textes'
+import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, DEMANDE_CAP, DEMANDE_RELAIS, REPRISE_RELAIS, SYSTEME_PLUME, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, autresActives, ficheDe, lireFiche, nomFichier, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
@@ -17,6 +17,7 @@ export const mesuresA = atom({ plugin: 'pupitre', key: 'mesures' } as const, MES
 export const lignesA = atom({ plugin: 'pupitre', key: 'lignes' } as const, [] as LigneFil[])
 export const autresA = atom({ plugin: 'pupitre', key: 'autres' } as const, [] as Autre[])
 export const maintenantA = atom({ plugin: 'pupitre', key: 'maintenant' } as const, 0)
+export const plumeA = atom({ plugin: 'pupitre', key: 'plume' } as const, { original: null, jusqua: 0, enCours: false } as Plume)
 
 let derniereUsage: UsageLu | null = null
 
@@ -49,6 +50,43 @@ async function lancerRelais($: Dollar): Promise<void> {
   consigneSuivante = [CONSIGNE_RELAIS]
   $.ui.toast('Pupitre : relais en cours…')
   void $.prompt.submit({ text: DEMANDE_RELAIS })
+}
+
+async function capacites($: Dollar): Promise<Capacite[]> {
+  const out: Capacite[] = []
+  try { for (const c of await $.command.list()) out.push({ sorte: 'commande', nom: c.name, description: c.description }) } catch { /* ignoré */ }
+  try { for (const t of await $.tool.list()) out.push({ sorte: t.mcp ? 'connecteur' : 'outil', nom: t.name, description: t.description }) } catch { /* ignoré */ }
+  try { for (const a of await $.agent.list()) out.push({ sorte: 'sous-agent', nom: a.type, description: a.description }) } catch { /* ignoré */ }
+  return out
+}
+
+async function ameliorer($: Dollar): Promise<void> {
+  const etat = await read($, plumeA)
+  if (etat.enCours) return
+  const { text: brouillon } = await $.prompt.read()
+  if (!brouillon.trim()) { $.ui.toast("Écris d'abord ta demande."); return }
+  await update($, plumeA, p => ({ ...p, enCours: true }))
+  try {
+    const demande = { system: SYSTEME_PLUME, prompt: promptPlume(brouillon, await capacites($)), maxTokens: 2000, timeoutMs: 60_000 }
+    let r = await $.model.complete({ ...demande, model: 'sonnet' })
+    if (!r.isAnswered && r.reason === 'api-error') r = await $.model.complete({ ...demande, model: await $.session.model() })
+    const texte = r.isAnswered ? nettoyerReponse(r.text) : ''
+    if (!texte) { $.ui.toast('Amélioration impossible : réessaie.'); return }
+    const fait = await $.prompt.fill({ text: texte, mode: 'replace' })
+    if (!fait.isFilled) { $.ui.toast("La zone de texte n'est pas disponible."); return }
+    const jusqua = (await $.clock.now()) + 30_000
+    await update($, plumeA, p => ({ ...p, original: brouillon, jusqua }))
+    $.clock.after(30_000, () => { void update($, plumeA, p => (p.jusqua === jusqua ? { ...p, original: null } : p)) })
+  } finally {
+    await update($, plumeA, p => ({ ...p, enCours: false }))
+  }
+}
+
+async function revenir($: Dollar): Promise<void> {
+  const p = await read($, plumeA)
+  if (p.original === null) return
+  await $.prompt.fill({ text: p.original, mode: 'replace' })
+  await update($, plumeA, x => ({ ...x, original: null }))
 }
 
 async function nomAgent($: Dollar, agentId: string): Promise<void> {
@@ -241,6 +279,11 @@ export const register: Register = on => {
     const r = await read($, reglagesA)
     const boutons: Bouton[] = []
     if (r.relais) boutons.push({ cle: 'relais', libelle: 'Passer le relais', action: () => { void lancerRelais($) } })
+    const plume = await read($, plumeA)
+    if (r.plume) {
+      if (plume.original !== null) boutons.push({ cle: 'revenir', libelle: 'Revenir à mon texte', action: () => { void revenir($) } })
+      else boutons.push({ cle: 'plume', libelle: plume.enCours ? 'Amélioration…' : 'Améliorer le prompt', action: () => { void ameliorer($) } })
+    }
     const arbre = dessinerBande(T, e.surface, e.props.bodyColumns, e.props.maxRows, {
       reglages: r,
       mesures: await read($, mesuresA),

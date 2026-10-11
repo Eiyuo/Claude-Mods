@@ -7,6 +7,7 @@ export type LigneFil = {
   progression: number; avant: number; niveau: Niveau; niveauAvant: Niveau
   fini: boolean; eclat: boolean; debut: number; majLe: number; finiLe: number | null
 }
+export type Plume = { original: string | null; jusqua: number; enCours: boolean }
 export type Autre = { id: string; titre: string; tache: string; compteur: string; progression: number; niveau: Niveau; debut: number; majLe: number }
 
 declare module 'claude-code' {
@@ -17,6 +18,7 @@ declare module 'claude-code' {
       lignes: LigneFil[]
       autres: Autre[]
       maintenant: number
+      plume: Plume
     }
   }
 }

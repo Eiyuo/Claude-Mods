@@ -34,3 +34,28 @@ export const REPRISE_RELAIS =
 export function relaisEcrit(mtimeMs: number | null, debut: number): boolean {
   return mtimeMs !== null && mtimeMs >= debut
 }
+
+export type Capacite = { sorte: 'commande' | 'outil' | 'connecteur' | 'sous-agent'; nom: string; description: string }
+
+export const SYSTEME_PLUME =
+  "Tu réécris la demande qu'un utilisateur s'apprête à envoyer à Claude Code, pour qu'elle soit précise et complète. " +
+  "Règles : garde sa langue et son intention ; n'invente aucun fait, aucun fichier, aucune contrainte ; rends explicites " +
+  "le but, le contexte utile, les contraintes et le résultat attendu ; si un outil, une commande, un connecteur ou un " +
+  "sous-agent de la liste fournie sert vraiment, cite-le par son nom exact (une commande s'écrit avec « / ») ; reste court " +
+  "et direct, en tutoyant ; réponds uniquement par le texte réécrit, sans titre, sans guillemets, sans commentaire."
+
+const MAX_CAPACITES = 150
+
+export function promptPlume(brouillon: string, capacites: readonly Capacite[]): string {
+  const liste = capacites.slice(0, MAX_CAPACITES)
+    .map(c => `- ${c.sorte} ${c.sorte === 'commande' ? '/' : ''}${c.nom} : ${c.description.replace(/\s+/g, ' ').slice(0, 140)}`)
+    .join('\n')
+  return `Ce dont Claude dispose dans cette session :\n${liste}\n\nDemande à réécrire :\n<<<\n${brouillon}\n>>>`
+}
+
+export function nettoyerReponse(texte: string): string {
+  let t = texte.trim()
+  t = t.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '')
+  t = t.replace(/^<<<\n?/, '').replace(/\n?>>>$/, '')
+  return t.trim()
+}
