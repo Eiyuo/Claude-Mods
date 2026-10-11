@@ -20,6 +20,7 @@ declare module 'claude-code' {
       maintenant: number
       plume: Plume
       reglagesOuverts: boolean
+      charge: boolean
     }
   }
 }

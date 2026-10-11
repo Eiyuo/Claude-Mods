@@ -50,10 +50,10 @@ Les maquettes validées ont été montrées dans la conversation. Elles ne sont 
   - `tool.call` signale chaque outil appelé, avec `agentId` pour un sous-agent (absent pour Claude).
   - `agent.spawn` signale le lancement d'un sous-agent.
   - Les outils `TaskCreate`, `TaskUpdate` et `TodoWrite` portent les listes de tâches.
-- **La zone de saisie.** `$.prompt.read()` lit le brouillon, `$.prompt.fill({ text, mode })` le remplace. `$.prompt.submit()` envoie une demande ; le moteur refuse un envoi fait depuis un `command.run`, et retire le `context` joint à la demande d'un mod. Le mod envoie donc juste après la commande, et sa consigne passe par `prompt.compose` le temps du tour suivant.
+- **La zone de saisie.** `$.prompt.read()` lit le brouillon, `$.prompt.fill({ text, mode })` le remplace. `$.prompt.submit()` envoie une demande ; le moteur refuse un envoi fait depuis un `command.run`, et retire le `context` joint à la demande d'un mod. Le mod envoie donc juste après la commande, avec la consigne entière dans le texte : sur l'application, ce qu'un `prompt.compose` ajoute au prompt système n'arrive pas à Claude (vu à l'essai du relais).
 - **Les commandes.**
   - `$.command.register` déclare une commande, et un hook `command.run` y répond.
-  - `$.command.run({ command: 'clear' })` lance `/clear`.
+  - `$.command.run({ command: 'clear' })` lance `/clear`. Après un `/clear`, la conversation neuve repart d'un état vide et `session.start` ne revient pas (vérifié avec une sonde) : le tic d'une seconde remet réglages, mesures et barres.
   - `$.command.list()`, `$.tool.list()` et `$.agent.list()` donnent les skills, les commandes, les outils (connecteurs compris) et les sous-agents.
 - **Le reste.** `$.model.complete({ model, system, prompt })` appelle un modèle. `$.store` garde des valeurs d'une session à l'autre. `$.fs` lit et écrit des fichiers, `$.clock` fournit les minuteries et `$.audio.play` joue un son du mod. `$.ui.toast` affiche un message.
 
@@ -221,12 +221,12 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 ## 10. /cap, /relais, /plume
 
 ### /cap
-- **Déclenchement.** Taper `/cap` envoie une courte demande visible (« /cap — fixer le cap »). Elle est accompagnée d'une consigne invisible, ajoutée au prompt système le temps de ce tour (`prompt.compose`) : relire la conversation, puis poser de 1 à 4 questions avec la fenêtre à choix.
+- **Déclenchement.** Taper `/cap` envoie une demande visible qui contient toute la consigne : relire la conversation, puis poser de 1 à 4 questions avec la fenêtre à choix.
 - **Questions.** Prochaine étape, priorité, ce qu'on laisse de côté, et toute autre décision ouverte. Chacune a des options concrètes et une option recommandée.
 - **Ensuite.** Je reprends le travail sur le cap choisi.
 
 ### /relais (bouton « Passer le relais »)
-1. **La demande.** Le bouton envoie la demande « Passer le relais », avec une consigne invisible : écrire `relais.md` à la racine du projet ouvert, puis l'enregistrer dans git.
+1. **La demande.** Le bouton envoie la demande « Passer le relais », qui contient toute la consigne : écrire `relais.md` à la racine du projet ouvert, puis l'enregistrer dans git.
    - Contenu de `relais.md` : date ; où on en est ; ce qui a été fait ; ce qui reste à faire ; décisions prises (et pourquoi) ; contraintes et règles à respecter ; blocages et problèmes ; fichiers clés ; prochaine action précise.
    - Il ne contient ni l'identifiant d'entreprise ni le nom réel de l'utilisateur.
    - L'enregistrement dans git est un commit `docs: relais`, sans envoi sur GitHub.

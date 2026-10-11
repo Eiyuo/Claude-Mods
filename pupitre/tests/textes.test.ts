@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, DEMANDE_CAP, REPRISE_RELAIS, SYSTEME_PLUME, chrono, nettoyerReponse, promptPlume, relaisEcrit } from '../hooks/textes'
+import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, REPRISE_RELAIS, SYSTEME_PLUME, chrono, nettoyerReponse, promptPlume, relaisEcrit } from '../hooks/textes'
 
 describe('textes', () => {
   test('la consigne /fil demande une liste de tâches à Claude et aux sous-agents', async () => {
@@ -14,11 +14,10 @@ describe('textes', () => {
   })
 })
 
-test('/cap : consigne et demande', async () => {
+test('/cap : consigne', async () => {
   expect(CONSIGNE_CAP).toContain('AskUserQuestion')
   expect(CONSIGNE_CAP).toContain('1 à 4')
   expect(CONSIGNE_CAP).toContain('(Recommandé)')
-  expect(DEMANDE_CAP.length).toBeGreaterThan(0)
 })
 
 test('/relais : consigne complète, sans identité, sans push', async () => {

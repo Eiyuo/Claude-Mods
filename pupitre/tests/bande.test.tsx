@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import { PAR_CAR_BUREAU, dispositionJauge } from '../hooks/bande'
-import { CONSIGNE_CAP, DEMANDE_CAP } from '../hooks/textes'
+import { CONSIGNE_CAP, CONSIGNE_RELAIS } from '../hooks/textes'
 import { ficheDe } from '../hooks/partage'
 import type { LigneFil } from '../types'
 
@@ -228,19 +228,19 @@ test('chaque image porte l heure de son dessin : redessinée, son animation ne r
   await ui.unmount()
 })
 
-test('/cap : la demande part toute seule, et sa consigne accompagne ce tour-là seulement', async ($, on) => {
+// Sur l'application, ce qu'un mod ajoute au prompt système n'arrive pas à Claude (vu à l'essai du relais) :
+// la consigne entière part donc dans le message.
+test('/cap et relais : la demande part toute seule, consigne entière dans le message', async ($, on) => {
   const envoyes: string[] = []
   on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
-  on('prompt.compose', async () => ({ sections: [] }) as never)
   const horloge = await preparer($, on)
-  const consigne = async () => (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], tools: [], outputStyle: null, traits: [] } as never)).sections.some(s => s.text === CONSIGNE_CAP)
   await $.command.run({ command: 'cap', args: '' })
   await horloge.advance(10)
-  expect(envoyes).toEqual([DEMANDE_CAP])
-  await $.turn.start({ text: DEMANDE_CAP, turnId: 't2' } as never)
-  expect(await consigne()).toBe(true)
-  await $.turn.complete({ answer: '', durationMs: 5000, isAborted: false, turnId: 't2', reason: 'answer' } as never)
-  expect(await consigne()).toBe(false)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'relais' })
+  await horloge.advance(10)
+  expect(envoyes).toEqual([CONSIGNE_CAP, CONSIGNE_RELAIS])
+  await ui.unmount()
 })
 
 test('/cap : si la demande ne part pas, elle attend dans la zone de texte', async ($, on) => {
@@ -250,7 +250,7 @@ test('/cap : si la demande ne part pas, elle attend dans la zone de texte', asyn
   const horloge = await preparer($, on)
   await $.command.run({ command: 'cap', args: '' })
   await horloge.advance(10)
-  expect(remplis).toEqual([DEMANDE_CAP])
+  expect(remplis).toEqual([CONSIGNE_CAP])
 })
 
 test('carillon : sous Windows, c est PowerShell qui joue le son du mod (le moteur n y joue rien)', async ($, on) => {

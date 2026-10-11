@@ -12,14 +12,12 @@ export function chrono(ms: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
-export const DEMANDE_CAP = 'Fixe le cap : pose-moi tes questions sur la suite.'
 export const CONSIGNE_CAP =
   "L'utilisateur a tapé /cap : il veut fixer le cap. Relis la conversation, puis pose-lui de 1 à 4 questions avec l'outil " +
   "AskUserQuestion : prochaine étape, priorité, ce qu'on laisse de côté, et toute autre décision encore ouverte. Chaque " +
   "question a des options concrètes ; place ta recommandation en premier, avec « (Recommandé) » à la fin de son libellé. " +
   "Ensuite, reprends le travail sur le cap choisi, sans redemander."
 
-export const DEMANDE_RELAIS = 'Passer le relais : écris relais.md.'
 export const CONSIGNE_RELAIS =
   "Passer le relais. Écris le fichier relais.md à la racine du projet ouvert (remplace-le s'il existe), en français, " +
   "avec ces parties : la date ; où on en est ; ce qui a été fait ; ce qui reste à faire ; les décisions prises et pourquoi ; " +

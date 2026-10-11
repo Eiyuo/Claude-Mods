@@ -6,7 +6,7 @@ import { AUCUN, basculer, jaugeVisible, lireReglages, type Commande } from './re
 import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, DEMANDE_CAP, DEMANDE_RELAIS, REPRISE_RELAIS, SYSTEME_PLUME, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
+import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, REPRISE_RELAIS, SYSTEME_PLUME, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
@@ -19,16 +19,16 @@ export const autresA = atom({ plugin: 'pupitre', key: 'autres' } as const, [] as
 export const maintenantA = atom({ plugin: 'pupitre', key: 'maintenant' } as const, 0)
 export const plumeA = atom({ plugin: 'pupitre', key: 'plume' } as const, { original: null, jusqua: 0, enCours: false } as Plume)
 export const ouvertA = atom({ plugin: 'pupitre', key: 'reglagesOuverts' } as const, false)
+export const chargeA = atom({ plugin: 'pupitre', key: 'charge' } as const, false)
 
 let derniereUsage: UsageLu | null = null
 
 const suivis = new Map<string, Suivi>()        // 'claude' ou l'agentId
 const noms = new Map<string, string>()         // agentId -> « Sous-agent n · description »
 let numeroAgent = 0
-// Consigne d'une demande du mod (/cap, relais). Le moteur retire le contexte joint à l'envoi d'un mod : elle passe donc
-// par le prompt système, le temps du tour suivant (en attente jusqu'à son début, active jusqu'à sa fin).
-let consigneAttente: string | null = null
-let consigneTour: string | null = null
+// Un /clear ouvre une conversation neuve à l'état vide, sans session.start : le tic d'une seconde remet alors
+// réglages et mesures, et les barres gardées à la fin de l'ancienne conversation.
+let gardeClear: { lignes: LigneFil[]; autres: Autre[] } = { lignes: [], autres: [] }
 let relaisDepuis: number | null = null // heure du clic sur « Passer le relais », tant que le relais est en cours
 const SEUIL_SON_MS = 30_000 // carillon seulement après un travail de plus de 30 s
 let tourEnCours = false // turn.start ne dit pas qui démarre : on ne remet à zéro qu'au début d'un tour principal
@@ -49,10 +49,10 @@ async function majLignes($: Dollar): Promise<void> {
 }
 
 // Envoie une demande du mod hors du hook qui l'appelle : le moteur refuse un envoi fait depuis un command.run (il
-// attendrait le tour que ce hook tient). Si l'envoi échoue quand même, la demande attend dans la zone de texte ;
-// la consigne, elle, attend le prochain tour.
-function envoyer($: Dollar, texte: string, consigne: string): void {
-  consigneAttente = consigne
+// attendrait le tour que ce hook tient). Si l'envoi échoue quand même, la demande attend dans la zone de texte.
+// La consigne entière est dans le texte : le moteur retire le contexte joint à l'envoi d'un mod, et sur l'application
+// les ajouts au prompt système n'arrivent pas à Claude (vu à l'essai du relais).
+function envoyer($: Dollar, texte: string): void {
   $.clock.after(0, () => {
     void (async () => {
       let refus: string | undefined
@@ -68,7 +68,18 @@ async function lancerRelais($: Dollar): Promise<void> {
   if (relaisDepuis !== null) return
   relaisDepuis = await $.clock.now()
   $.ui.toast('Pupitre : relais en cours…')
-  envoyer($, DEMANDE_RELAIS, CONSIGNE_RELAIS)
+  envoyer($, CONSIGNE_RELAIS)
+}
+
+// Réglages (gardés sur le disque) et mesures : au démarrage, et de nouveau après un /clear.
+async function charger($: Dollar): Promise<void> {
+  const garde = lireReglages(await $.store.get('reglages'))
+  await update($, reglagesA, () => garde)
+  const u = await $.session.usage()
+  derniereUsage = { context: u.context, rateLimits: u.rateLimits }
+  const maintenant = await $.clock.now()
+  await update($, mesuresA, () => lireMesures(derniereUsage!, maintenant))
+  await update($, chargeA, () => true)
 }
 
 async function capacites($: Dollar): Promise<Capacite[]> {
@@ -168,14 +179,9 @@ export const register: Register = on => {
     await $.command.register({ name: 'relais', description: DESCRIPTIONS.relais })
     await $.command.register({ name: 'plume', description: DESCRIPTIONS.plume })
     await $.command.register({ name: 'cap', description: 'Claude te pose ses questions pour fixer la suite' })
-    const garde = lireReglages(await $.store.get('reglages'))
-    await update($, reglagesA, () => garde)
+    await charger($)
     await update($, lignesA, l => lignesGardees(l)) // suivis repart à vide : seules les barres finies (et leur croix) restent
 
-    const u = await $.session.usage()
-    derniereUsage = { context: u.context, rateLimits: u.rateLimits }
-    const maintenant0 = await $.clock.now()
-    await update($, mesuresA, () => lireMesures(derniereUsage!, maintenant0))
     $.clock.every(30_000, () => {
       void (async () => {
         if (!derniereUsage) return
@@ -185,6 +191,11 @@ export const register: Register = on => {
     })
     $.clock.every(1000, () => {
       void (async () => {
+        if (!(await read($, chargeA))) { // après un /clear
+          await charger($)
+          await update($, lignesA, () => gardeClear.lignes)
+          await update($, autresA, () => gardeClear.autres)
+        }
         const lignes = await read($, lignesA)
         if (lignes.some(l => !l.fini)) await majLignes($)
       })()
@@ -223,6 +234,7 @@ export const register: Register = on => {
   })
 
   on('session.end', async ($, e, next) => {
+    gardeClear = { lignes: [...await read($, lignesA)], autres: [...await read($, autresA)] }
     try {
       const maison = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')) ?? ''
       const moi = await $.session.id()
@@ -233,19 +245,11 @@ export const register: Register = on => {
 
   on('prompt.compose', async ($, e, next) => {
     const r = await next(e)
-    const ajouts = [
-      ...((await read($, reglagesA)).fil ? [{ id: 'pupitre-fil', text: CONSIGNE_FIL }] : []),
-      ...(consigneTour ? [{ id: 'pupitre-consigne', text: consigneTour }] : []),
-    ]
-    if (ajouts.length === 0) return r
-    return { ...r, sections: [...r.sections, ...ajouts.map(a => ({ ...a, scope: 'session' as const }))] }
+    if (!(await read($, reglagesA)).fil) return r
+    return { ...r, sections: [...r.sections, { id: 'pupitre-fil', text: CONSIGNE_FIL, scope: 'session' as const }] }
   })
 
   on('turn.start', async ($, e, next) => {
-    if (!tourEnCours) {
-      consigneTour = consigneAttente
-      consigneAttente = null
-    }
     if (!tourEnCours && (await read($, reglagesA)).fil) {
       tourEnCours = true
       const maintenant = await $.clock.now()
@@ -280,7 +284,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId ?? 'claude'
-    if (!e.agentId) { tourEnCours = false; consigneTour = null }
+    if (!e.agentId) tourEnCours = false
     if (!e.agentId && e.durationMs > SEUIL_SON_MS && !e.isAborted && (await read($, reglagesA)).fil) {
       void carillon($).catch(() => { /* pas de sortie audio */ })
     }
@@ -370,7 +374,7 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'cap' }, async $ => {
-    envoyer($, DEMANDE_CAP, CONSIGNE_CAP)
+    envoyer($, CONSIGNE_CAP)
     return { text: 'Pupitre : je prépare mes questions sur la suite.' }
   })
 
