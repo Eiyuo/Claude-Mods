@@ -72,7 +72,7 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 
 **À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. La croix **×** au bout de la ligne de Claude les retire. Sinon, elles sont remplacées à ta demande suivante.
 
-**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît en haut de la bande sur une ligne fine, sous « Autres discussions en cours ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre.
+**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît en haut de la bande sur une ligne fine, sous « Autres discussions ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre. Quand elle a fini, sa ligne passe au vert et reste affichée ; la croix **×** au bout de la ligne la retire.
 
 **Le son.** Un carillon doux de deux notes sonne quand Claude a fini, si la réponse a pris plus de 30 secondes. Pas de son pour les réponses rapides.
 

@@ -1,6 +1,8 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import { PAR_CAR_BUREAU, dispositionJauge } from '../hooks/bande'
 import { CONSIGNE_CAP, DEMANDE_CAP } from '../hooks/textes'
+import { ficheDe } from '../hooks/partage'
+import type { LigneFil } from '../types'
 
 const BANDE = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: true, maxRows: 20, bodyColumns: 120 } } as const
 
@@ -166,6 +168,42 @@ test('travail fini : la barre reste, avec une croix « Fermer », jusqu à ce qu
   expect(apres).not.toContain('Claude')
   expect(apres).not.toContain('Sous-agent')
   expect(apres).toContain('Contexte') // la jauge reste
+  await ui.unmount()
+})
+
+test('autre discussion finie : sa ligne reste, avec sa croix, même une fois l autre discussion fermée', async ($, on) => {
+  let fiche = ''
+  let ecriteLe = 0
+  mock.env(on, { USERPROFILE: 'C:/Users/essai' })
+  on('fs.write', async () => ({ value: undefined }) as never)
+  on('fs.list', async () => ({ value: fiche ? [{ name: 'autre.json', mtimeMs: ecriteLe }] : [] }) as never)
+  on('fs.read', async () => ({ value: fiche }) as never)
+  on('session.start', async (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
+  on('command.register', async () => ({ value: undefined }) as never)
+  on('session.id', async () => ({ value: 'moi' }) as never)
+  on('session.cwd', async () => ({ value: 'C:/Users/essai/ici' }) as never)
+  on('session.usage', async () => ({ value: { context: { window: 200_000 }, rateLimits: [] } }) as never)
+  const horloge = await preparer($, on)
+  await $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
+  const L: LigneFil = { id: 'claude', qui: 'Claude', tache: 'En cours', mot: 'Lecture', compteur: '≈', progression: 0.3, avant: 0, niveau: 1, niveauAvant: 1, fini: false, eclat: false, debut: horloge.now(), majLe: horloge.now(), finiLe: null }
+  const poser = (l: LigneFil) => { ecriteLe = horloge.now(); fiche = JSON.stringify(ficheDe('autre', 'REX', l, ecriteLe)) }
+  poser(L)
+  await horloge.advance(2_000)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const croix = async () => (await ui.findAll({ type: 'Button' })).filter(b => b.key === 'fermer-autre')
+  expect(JSON.stringify(await ui.drawn())).toContain('REX')
+  expect(await croix()).toHaveLength(0) // pas pendant le travail
+  poser({ ...L, fini: true, finiLe: horloge.now(), tache: 'Terminé', compteur: '✓', progression: 1, niveau: 3 })
+  await horloge.advance(2_000)
+  fiche = '' // l'autre discussion se ferme
+  await horloge.advance(60_000)
+  const reste = JSON.stringify(await ui.drawn())
+  expect(reste).toContain('REX')
+  expect(reste).toContain('Terminé')
+  const [x] = await croix()
+  expect(x!.props.label).toBe('×')
+  await ui.press({ key: 'fermer-autre' })
+  expect(JSON.stringify(await ui.drawn())).not.toContain('REX')
   await ui.unmount()
 })
 

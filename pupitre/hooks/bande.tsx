@@ -86,6 +86,7 @@ export type EtatBande = {
   maintenant: number // heure du dessin : chronos, et animations des images (voir pixels.ts)
   boutons: readonly Bouton[]
   fermer?: () => void // croix « Fermer » : retire les barres /fil une fois le travail fini
+  fermerAutre?: (id: string) => void // croix d'une autre discussion finie : retire sa ligne
   reglage?: ActionsReglage // ligne « Pupitre : ✓ Jauge ✓ Fil … », dépliée par le bouton « Réglages »
 }
 
@@ -140,7 +141,7 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   const fermer = s.fermer && lignes.length > 0 && lignes.every(l => l.fini) ? s.fermer : undefined
   // de haut en bas : autres discussions, /fil, la jauge, les boutons, puis les réglages dépliés sous « Réglages »
   const rangs = [
-    autres.length > 0 ? dessinerAutres(T, surface, colonnes, autres, s.maintenant) : null,
+    autres.length > 0 ? dessinerAutres(T, surface, colonnes, autres, s.maintenant, s.fermerAutre) : null,
     ...lignes.map((l, i) => ligne(T, surface, colonnes, l, s.maintenant, i === 0 ? fermer : undefined)),
     s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.maintenant) : null,
     jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons) : null,
@@ -150,26 +151,30 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   return <Box flexDirection="column" gap={1}>{rangs}</Box>
 }
 
-export function dessinerAutres(T: Elements, surface: string, colonnes: number, autres: readonly Autre[], maintenant: number) {
-  const { Box, Text, Svg } = T
-  const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4)
-  const w = Math.max(20, Math.round(largeur * PX_COL))
+export function dessinerAutres(T: Elements, surface: string, colonnes: number, autres: readonly Autre[], maintenant: number, fermer?: (id: string) => void) {
+  const { Box, Text, Svg, Button } = T
   return (
     <Box flexDirection="column">
-      <Text dimColor>Autres discussions en cours</Text>
-      {autres.map(a => (
-        <Box key={`a-${a.id}`} flexDirection="row" gap={1} alignItems="flex-end">
-          <Box width={COL_QUI}><Text wrap="truncate">{a.titre}</Text></Box>
-          <Box flexDirection="column" flexGrow={1}>
-            <Text dimColor wrap="truncate">{a.tache}</Text>
-            {surface === 'terminal' || Svg === undefined
-              ? <Text dimColor>{barreTexte(a.progression, largeur)}</Text>
-              : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: a.progression, palette: PALETTES_FIL[a.niveau]!, graine: graineDe(a.id), maintenant })} alt={`${a.titre} : ${a.tache}`} width={w} height={10} />}
+      <Text dimColor>Autres discussions</Text>
+      {autres.map(a => {
+        const croix = fermer && a.finiLe !== null
+        const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4 - (croix ? COL_FERMER : 0))
+        const w = Math.max(20, Math.round(largeur * PX_COL))
+        return (
+          <Box key={`a-${a.id}`} flexDirection="row" gap={1} alignItems="flex-end">
+            <Box width={COL_QUI}><Text wrap="truncate">{a.titre}</Text></Box>
+            <Box flexDirection="column" flexGrow={1}>
+              <Text dimColor wrap="truncate">{a.tache}</Text>
+              {surface === 'terminal' || Svg === undefined
+                ? <Text dimColor>{barreTexte(a.progression, largeur)}</Text>
+                : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: a.progression, palette: PALETTES_FIL[a.niveau]!, graine: graineDe(a.id), maintenant })} alt={`${a.titre} : ${a.tache}`} width={w} height={10} />}
+            </Box>
+            <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{a.compteur}</Text></Box>
+            <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono((a.finiLe ?? maintenant) - a.debut)}</Text></Box>
+            {croix ? <Button key={`fermer-${a.id}`} label="×" onPress={() => fermer(a.id)} /> : null}
           </Box>
-          <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{a.compteur}</Text></Box>
-          <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono(maintenant - a.debut)}</Text></Box>
-        </Box>
-      ))}
+        )
+      })}
     </Box>
   )
 }

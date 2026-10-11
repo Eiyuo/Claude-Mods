@@ -7,7 +7,7 @@ import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
 import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, DEMANDE_CAP, DEMANDE_RELAIS, REPRISE_RELAIS, SYSTEME_PLUME, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
-import { PERIME_MS, autresActives, ficheDe, lireFiche, nomFichier, titreDe, type Fiche } from './partage'
+import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
 
@@ -214,9 +214,9 @@ export const register: Register = on => {
         for (const en of entrees.filter(x => x.name.endsWith('.json') && x.name !== nomFichier(moi) && maintenant - x.mtimeMs <= PERIME_MS).slice(0, 20)) {
           try { fiches.push(lireFiche(String(await $.fs.read(`${dossier}/${en.name}`)))) } catch { fiches.push(null) }
         }
-        const autres = autresActives(fiches, moi, maintenant)
+        const suivre = (avant: readonly Autre[]) => suivreAutres(avant, fiches, moi, maintenant)
         const avant = await read($, autresA)
-        if (JSON.stringify(avant) !== JSON.stringify(autres)) await update($, autresA, () => autres)
+        if (JSON.stringify(avant) !== JSON.stringify(suivre(avant))) await update($, autresA, suivre)
       })()
     })
     return next(e)
@@ -359,6 +359,7 @@ export const register: Register = on => {
       maintenant,
       boutons,
       fermer: () => { void fermerFil($) },
+      fermerAutre: id => { void update($, autresA, l => l.filter(a => a.id !== id)) },
       reglage: {
         ouvert: await read($, ouvertA),
         basculer: c => { void boutonReglage($, c) },
