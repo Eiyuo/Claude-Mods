@@ -72,7 +72,7 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 
 **Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa ligne juste sous celle de Claude (« ↳ 1 · sa description »), avec la même barre. Quand il finit, sa ligne passe au vert et reste affichée jusqu'à la croix.
 
-**À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. La croix **×** au bout de la ligne de Claude les retire. Sinon, elles sont remplacées à ta demande suivante.
+**À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. La croix **×** au bout de la ligne de Claude les retire. Sinon, elles sont remplacées à ta demande suivante. Dès que 2 barres ou plus sont finies (les tiennes comme celles des autres discussions), le bouton **« Effacer les barres finies »** apparaît sur la ligne des boutons : il retire toutes les barres vertes d'un coup et garde celles en cours.
 
 **Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît dans la même liste, avec le nom de son dossier : « Ajoute du beurre… · essai-relais ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre. Quand elle a fini, sa ligne passe au vert et reste affichée ; la croix **×** au bout de la ligne la retire.
 
