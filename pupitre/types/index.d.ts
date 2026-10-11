@@ -7,6 +7,7 @@ export type LigneFil = {
   progression: number; avant: number; niveau: Niveau; niveauAvant: Niveau
   fini: boolean; eclat: boolean; debut: number; majLe: number; finiLe: number | null
 }
+export type Autre = { id: string; titre: string; tache: string; compteur: string; progression: number; niveau: Niveau; debut: number; majLe: number }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -14,6 +15,8 @@ declare module 'claude-code' {
       reglages: Reglages
       mesures: Mesures
       lignes: LigneFil[]
+      autres: Autre[]
+      maintenant: number
     }
   }
 }
