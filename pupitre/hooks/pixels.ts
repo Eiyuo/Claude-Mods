@@ -8,8 +8,9 @@ export const PALETTES_FIL: readonly (readonly string[])[] = [
   ['#7CC280', '#58B060', '#3C9C48', '#288037'],
 ]
 export const PALETTES_JAUGE = {
-  violet: ['#B2A6EE', '#9687E4', '#7C6CDC', '#6452D0'],
-  orange: ['#F5AA5F', '#EE9646', '#E8862A', '#D6761E'],
+  vert: ['#7CC280', '#58B060', '#3C9C48', '#288037'],
+  jaune: ['#F2D06B', '#EBC24A', '#DDB02E', '#C99A1C'],
+  orange:['#F5AA5F', '#EE9646', '#E8862A', '#D6761E'],
   rouge: ['#E66E6E', '#DE5A5A', '#D64545', '#C43737'],
 } as const
 export const TEXTE_NIVEAU: readonly string[] = ['#5B4BC4', '#2C5FC0', '#0F7C76', '#2F7A3B']
@@ -24,8 +25,8 @@ export function niveauDe(progression: number, fini: boolean): Niveau {
   return 2
 }
 
-export function couleurJauge(pct: number): 'violet' | 'orange' | 'rouge' {
-  return pct >= 90 ? 'rouge' : pct >= 75 ? 'orange' : 'violet'
+export function couleurJauge(pct: number): keyof typeof PALETTES_JAUGE {
+  return pct >= 90 ? 'rouge' : pct >= 75 ? 'orange' : pct >= 50 ? 'jaune' : 'vert'
 }
 
 export function echapper(s: string): string {

@@ -14,7 +14,10 @@ describe('niveaux et couleurs', () => {
     expect(niveauDe(0.2, true)).toBe(3)
   })
   test('seuils de la jauge', async () => {
-    expect(couleurJauge(74.9)).toBe('violet')
+    expect(couleurJauge(0)).toBe('vert')
+    expect(couleurJauge(49.9)).toBe('vert')
+    expect(couleurJauge(50)).toBe('jaune')
+    expect(couleurJauge(74.9)).toBe('jaune')
     expect(couleurJauge(75)).toBe('orange')
     expect(couleurJauge(89.9)).toBe('orange')
     expect(couleurJauge(90)).toBe('rouge')

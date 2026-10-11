@@ -30,7 +30,7 @@ Recréer, dans un seul mod Claude Code, cinq fonctions vues dans une vidéo, san
 | /fil, curseur | Il prend la couleur foncée de la barre et contient **un mot** décrivant l'étape en cours, en blanc |
 | /fil, sous-agents | Même barre que Claude |
 | /fil, son | Carillon doux de 2 notes à la fin d'une réponse, **seulement si elle a pris plus de 30 s** |
-| /jauge, couleurs | Violet sous 75 %, orange de 75 à 90 %, rouge au-delà. Partie remplie pleine, sans trous |
+| /jauge, couleurs | Vert sous 50 % (large), jaune de 50 à 75 % (à surveiller), orange de 75 à 90 % (ça presse), rouge au-delà (critique). Partie remplie pleine, sans trous |
 | /cap | Seulement quand on tape /cap |
 | /relais | `relais.md` à la racine du projet ouvert, **enregistré dans git** (commit local ; l'envoi sur GitHub reste à la demande) |
 | /plume | **Remplace** le texte de la zone de saisie. Un bouton « Revenir à mon texte » reste disponible 30 s |
@@ -163,7 +163,7 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
   - **Contexte** : % et « 84 k / 200 k jetons » ;
   - **Limite 5 h** : % et « remise à zéro dans 1 h 52 » ;
   - **Limite 7 jours** : % et « remise à zéro dans 3 j 4 h ».
-- **Couleur de chaque barre.** Violet sous 75 %, orange de 75 à 90 %, rouge à partir de 90 %.
+- **Couleur de chaque barre.** Vert sous 50 %, jaune de 50 à 75 %, orange de 75 à 90 %, rouge à partir de 90 %.
 - **Mise à jour.** Les chiffres viennent de `session.measure` (à chaque réponse) et de `$.session.usage()` au démarrage. Le compte à rebours est recalculé toutes les 30 s.
 - **Mesure absente.** Une mesure que Claude Code ne donne pas affiche « — » (par exemple sans abonnement, ou avant la première réponse).
 - **Boutons.** À droite, « Passer le relais » si /relais est allumé, et « Améliorer le prompt » si /plume est allumé. Pendant l'amélioration, le bouton affiche « Amélioration… » ; ensuite, « Revenir à mon texte » pendant 30 s.
