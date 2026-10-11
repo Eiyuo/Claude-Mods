@@ -23,7 +23,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 À chaque changement, un petit message confirme ce qui est allumé ou éteint, par exemple « Pupitre : fil éteint ». Les réglages sont gardés d'une session à l'autre.
 
-**Sans taper de commande : le bouton « Réglages ».** Il est au bout de la ligne de la jauge. Un clic déplie au-dessus la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · Tout éteindre · Replier ». Chaque bouton allume (✓) ou éteint (○) sa fonction ; « Replier » range la ligne. Si tu éteins tout, la bande disparaît : tape `/pupitre` pour la rallumer.
+**Sans taper de commande : le bouton « Réglages ».** Il est au bout de la ligne des boutons. Un clic déplie juste au-dessus la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · Tout éteindre · Replier ». Chaque bouton allume (✓) ou éteint (○) sa fonction ; « Replier » range la ligne. Si tu éteins tout, la bande disparaît : tape `/pupitre` pour la rallumer.
 
 ### La jauge (`/jauge`)
 
@@ -45,7 +45,7 @@ Le symbole **↻** donne le temps avant la remise à zéro (il quitte la ligne s
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 
-À droite de la jauge apparaissent les boutons de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ».
+Juste au-dessus de la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ».
 
 ### Le fil (`/fil`)
 

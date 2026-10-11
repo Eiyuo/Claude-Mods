@@ -49,16 +49,25 @@ function mesure(T: Elements, surface: string, nom: string, m: Mesure, barre: num
   )
 }
 
-export function dessinerJauge(T: Elements, surface: string, colonnes: number, mesures: Mesures, montrerMesures: boolean, boutons: readonly Bouton[], majLe: number) {
-  const { Box, Button } = T
+// La ligne de la jauge : les trois mesures seules, réparties sur toute la largeur.
+export function dessinerJauge(T: Elements, surface: string, colonnes: number, mesures: Mesures, majLe: number) {
+  const { Box } = T
   const parCar = surface === 'terminal' ? 1 : 0.75
-  const placeBoutons = boutons.reduce((n, b) => n + Math.ceil(b.libelle.length * parCar) + 4, 0)
-  const liste: [string, Mesure][] = montrerMesures ? [['Contexte', mesures.contexte], ['Limite 5 h', mesures.cinqH], ['Limite 7 jours', mesures.septJ]] : []
-  const { barre, avecCourt } = dispositionJauge(colonnes, liste.map(([nom, m]) => ({ nom, pct: formatPct(m.pct), court: m.court ?? '' })), placeBoutons, parCar)
+  const liste: [string, Mesure][] = [['Contexte', mesures.contexte], ['Limite 5 h', mesures.cinqH], ['Limite 7 jours', mesures.septJ]]
+  const { barre, avecCourt } = dispositionJauge(colonnes, liste.map(([nom, m]) => ({ nom, pct: formatPct(m.pct), court: m.court ?? '' })), 0, parCar)
   return (
-    <Box flexDirection="row" alignItems="center" justifyContent={liste.length > 0 ? 'space-between' : 'flex-end'} gap={ECART}>
-      {liste.length > 0 ? <Box flexDirection="row" alignItems="center" gap={ECART}>{liste.map(([nom, m]) => mesure(T, surface, nom, m, barre, avecCourt, majLe))}</Box> : null}
-      {boutons.length > 0 ? <Box flexDirection="row" alignItems="center" gap={1}>{boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}</Box> : null}
+    <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={ECART}>
+      {liste.map(([nom, m]) => mesure(T, surface, nom, m, barre, avecCourt, majLe))}
+    </Box>
+  )
+}
+
+// La ligne des boutons, au-dessus de la jauge, calée à droite.
+export function dessinerBoutons(T: Elements, boutons: readonly Bouton[]) {
+  const { Box, Button } = T
+  return (
+    <Box flexDirection="row" alignItems="center" justifyContent="flex-end" gap={1}>
+      {boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}
     </Box>
   )
 }
@@ -115,20 +124,18 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   const lignes = s.reglages.fil ? (maxRows < 8 ? s.lignes.filter(l => l.id === 'claude') : s.lignes) : []
   const autres = s.reglages.fil ? s.autres : []
   if (!jauge && lignes.length === 0 && autres.length === 0) return null
-  const barreJauge = jauge ? dessinerJauge(T, surface, colonnes, s.mesures, s.reglages.jauge && maxRows >= 3, s.boutons, s.majJauge) : null
-  const ligneReglages = jauge && s.reglage?.ouvert ? dessinerReglages(T, s.reglages, s.reglage) : null
-  if (!ligneReglages && lignes.length === 0 && autres.length === 0) return barreJauge // au repos : une seule ligne
-  // « Fermer » sur la première ligne, une fois que tout est fini
+  // « Fermer » sur la première ligne /fil, une fois que tout est fini
   const fermer = s.fermer && lignes.length > 0 && lignes.every(l => l.fini) ? s.fermer : undefined
-  // de haut en bas : réglages dépliés, autres discussions, /fil, puis la jauge, toujours au plus près de la zone de texte
-  return (
-    <Box flexDirection="column" gap={1}>
-      {ligneReglages}
-      {autres.length > 0 ? dessinerAutres(T, surface, colonnes, autres, s.maintenant) : null}
-      {lignes.map((l, i) => ligne(T, surface, colonnes, l, s.maintenant, i === 0 ? fermer : undefined))}
-      {barreJauge}
-    </Box>
-  )
+  // de haut en bas : autres discussions, /fil, réglages dépliés, boutons, puis la jauge, toujours au plus près de la zone de texte
+  const rangs = [
+    autres.length > 0 ? dessinerAutres(T, surface, colonnes, autres, s.maintenant) : null,
+    ...lignes.map((l, i) => ligne(T, surface, colonnes, l, s.maintenant, i === 0 ? fermer : undefined)),
+    jauge && s.reglage?.ouvert ? dessinerReglages(T, s.reglages, s.reglage) : null,
+    jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons) : null,
+    s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.majJauge) : null,
+  ].filter(r => r !== null)
+  if (rangs.length === 1) return rangs[0]
+  return <Box flexDirection="column" gap={1}>{rangs}</Box>
 }
 
 export function dessinerAutres(T: Elements, surface: string, colonnes: number, autres: readonly Autre[], maintenant: number) {

@@ -53,16 +53,36 @@ test('chaque barre a sa largeur et sa hauteur fixées (sinon le bureau lui donne
   await ui.unmount()
 })
 
-test('au repos, la jauge tient sur une seule ligne', async ($, on) => {
+test('au repos : les boutons sur une ligne, la jauge seule sur la ligne du dessous', async ($, on) => {
   mock.store(on)
   mock.clock(on, { now: 1_000_000 })
   await $.command.run({ command: 'pupitre', args: '' })
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
-    const boites = await ui.findAll({ type: 'Box' })
-    expect(boites.some(b => b.props.flexDirection === 'column')).toBe(false)
+    const arbre = (await ui.drawn()) as unknown as { props: Record<string, unknown>; children: unknown[] }
+    expect(arbre.props.flexDirection).toBe('column')
+    expect(arbre.children).toHaveLength(2)
+    const [haut, bas] = arbre.children.map(c => JSON.stringify(c))
+    expect(haut).toContain('Réglages')
+    expect(haut).not.toContain('Contexte')
+    expect(bas).toContain('Contexte')
+    expect(bas).toContain('Limite 7 jours')
+    expect(bas).not.toContain('"Button"')
     await ui.unmount()
   }
+})
+
+test('jauge éteinte : il ne reste que la ligne des boutons', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: 1_000_000 })
+  await $.command.run({ command: 'pupitre', args: '' })
+  await $.command.run({ command: 'jauge', args: '' })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const arbre = JSON.stringify(await ui.drawn())
+  expect(arbre).toContain('Réglages')
+  expect(arbre).not.toContain('Contexte')
+  expect(arbre).not.toContain('"flexDirection":"column"')
+  await ui.unmount()
 })
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
