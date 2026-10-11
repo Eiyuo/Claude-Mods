@@ -127,7 +127,8 @@ export function dessinerReglages(T: Elements, r: Reglages, a: ActionsReglage) {
 
 // Une ligne par travail, aux mêmes colonnes partout : icône, titre, barre, %, temps, croix. La place de la croix
 // est gardée sur chaque ligne : toutes les barres ont la même longueur, et les textes restent alignés.
-const COL_ICONE = 2, COL_TITRE = 30, COL_PCT = 6, COL_CHRONO = 7, COL_FERMER = 7
+// Au plus juste : « 100 % », « 12:34 », et la croix (« [ × ] » au terminal) ; le reste va à la barre.
+const COL_ICONE = 2, COL_TITRE = 26, COL_PCT = 5, COL_CHRONO = 6, COL_FERMER = 5
 
 export function largeurBarre(colonnes: number): number {
   return Math.max(10, colonnes - COL_ICONE - COL_TITRE - COL_PCT - COL_CHRONO - COL_FERMER - 5)
