@@ -38,7 +38,7 @@ function mesure(T: Elements, surface: string, nom: string, m: Mesure, barre: num
   const court = avecCourt ? (m.court ?? '') : ''
   const dessin = surface === 'terminal' || Svg === undefined
     ? <Text dimColor>{barreTexte(pct / 100, barre)}</Text>
-    : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], graine: graineDe(nom), majLe, titre })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} isInteractive />
+    : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], graine: graineDe(nom), majLe, titre })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} />
   return (
     <Box key={nom} flexDirection="row" alignItems="center" gap={1}>
       <Text dimColor>{nom}</Text>
@@ -78,7 +78,7 @@ function ligne(T: Elements, surface: string, colonnes: number, l: LigneFil, main
   const w = Math.max(40, Math.round(largeur * PX_COL))
   const barre = surface === 'terminal' || Svg === undefined
     ? <Text color={TEXTE_NIVEAU[l.niveau]}>{barreTexte(l.progression, largeur - l.mot.length - 1)} {l.mot}</Text>
-    : <Svg key={`b-${l.id}`} source={svgFil({ largeur: w, progression: l.progression, avant: l.avant, niveau: l.niveau, niveauAvant: l.niveauAvant, fini: l.fini, eclat: l.eclat, mot: l.mot, graine: graineDe(l.id), majLe: l.majLe })} alt={`${l.qui} : ${l.tache}, ${l.compteur}`} width={w} height={22} isInteractive />
+    : <Svg key={`b-${l.id}`} source={svgFil({ largeur: w, progression: l.progression, avant: l.avant, niveau: l.niveau, niveauAvant: l.niveauAvant, fini: l.fini, eclat: l.eclat, mot: l.mot, graine: graineDe(l.id), majLe: l.majLe })} alt={`${l.qui} : ${l.tache}, ${l.compteur}`} width={w} height={22} />
   return (
     <Box key={`l-${l.id}`} flexDirection="row" gap={1} alignItems="flex-end">
       <Box width={COL_QUI}><Text dimColor wrap="truncate">{l.qui}</Text></Box>
@@ -127,7 +127,7 @@ export function dessinerAutres(T: Elements, surface: string, colonnes: number, a
             <Text dimColor wrap="truncate">{a.tache}</Text>
             {surface === 'terminal' || Svg === undefined
               ? <Text dimColor>{barreTexte(a.progression, largeur)}</Text>
-              : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: a.progression, palette: PALETTES_FIL[a.niveau]!, graine: graineDe(a.id), majLe: a.majLe })} alt={`${a.titre} : ${a.tache}`} width={w} height={10} isInteractive />}
+              : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: a.progression, palette: PALETTES_FIL[a.niveau]!, graine: graineDe(a.id), majLe: a.majLe })} alt={`${a.titre} : ${a.tache}`} width={w} height={10} />}
           </Box>
           <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{a.compteur}</Text></Box>
           <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono(maintenant - a.debut)}</Text></Box>

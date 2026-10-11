@@ -110,3 +110,13 @@ test('travail fini : la barre reste, avec « Fermer », jusqu à ce qu on la fer
   expect(apres).toContain('Contexte') // la jauge reste
   await ui.unmount()
 })
+
+test('aucune barre en cadre interactif : un cadre se recharge à chaque changement et fait clignoter la barre', async ($, on) => {
+  await preparer($, on)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const svgs = await ui.findAll({ type: 'Svg' })
+  expect(svgs.length).toBe(4)
+  for (const s of svgs) expect(s.props.isInteractive ?? false).toBe(false)
+  await ui.unmount()
+})

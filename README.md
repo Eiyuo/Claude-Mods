@@ -39,7 +39,7 @@ Les couleurs :
 | Orange | De 75 à 90 % |
 | Rouge | 90 % et plus |
 
-Le symbole **↻** donne le temps avant la remise à zéro (il quitte la ligne si la place manque). Passe la souris sur une barre pour voir le détail : nombre de jetons, ou la phrase complète.
+Le symbole **↻** donne le temps avant la remise à zéro (il quitte la ligne si la place manque).
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 

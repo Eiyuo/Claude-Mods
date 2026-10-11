@@ -105,7 +105,7 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 ## 6. La bande au-dessus de la zone de texte
 
 - **Ordre.** De haut en bas : les autres discussions, /fil, puis la jauge. La jauge reste toujours au plus près de la zone de texte (demande du 11/10/2026).
-- **Jauge sur une ligne.** « Contexte ▰▰▱ 86 % · Limite 5 h ▰▱▱ 14 % ↻ 2 h 12 · Limite 7 jours ▰▰▱ 31 % ↻ 5 j 5 h », puis les boutons à droite. Les barres prennent la place qui reste (20 colonnes au plus) ; sous 6 colonnes, les comptes à rebours « ↻ » quittent la ligne. Le détail (jetons, phrase de remise à zéro) est dans l'info-bulle de chaque barre.
+- **Jauge sur une ligne.** « Contexte ▰▰▱ 86 % · Limite 5 h ▰▱▱ 14 % ↻ 2 h 12 · Limite 7 jours ▰▰▱ 31 % ↻ 5 j 5 h », puis les boutons à droite. Les barres prennent la place qui reste (20 colonnes au plus) ; sous 6 colonnes, les comptes à rebours « ↻ » quittent la ligne. Les barres sont des images (`Svg` sans `isInteractive`) : un cadre interactif se recharge à chaque changement et fait clignoter la barre ; une image garde l'ancienne version jusqu'à ce que la nouvelle soit prête. Pas d'info-bulle, donc.
 - **Taille des barres.** Chaque `Svg` reçoit `width` et `height` : sans eux, le bureau donne 150 px de haut au cadre interactif.
 - **Affichage.** Rien ne s'affiche quand tout est éteint, ou quand /fil n'a rien à montrer et que la jauge est éteinte.
 - **Pas de redessin à vide.** La bande n'est redessinée que quand une valeur change : nouvelle mesure, tâche, étape, sous-agent, autre session, ou chaque seconde pour le chrono quand /fil est actif. Le scintillement et le reflet tournent seuls dans le SVG.
