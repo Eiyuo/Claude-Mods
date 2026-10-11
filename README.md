@@ -41,7 +41,7 @@ Les couleurs :
 | Orange | De 75 à 90 % |
 | Rouge | 90 % et plus |
 
-Le symbole **↻** donne le temps avant la remise à zéro (il quitte la ligne si la place manque).
+Le symbole **↻** donne le temps avant la remise à zéro. Chaque texte tient sur une seule ligne. Si la fenêtre est trop étroite, la jauge se resserre dans cet ordre : les barres raccourcissent, puis les « ↻ » quittent la ligne, puis les noms deviennent « 5 h » et « 7 jours ».
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 

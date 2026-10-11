@@ -1,25 +1,41 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
-import { dispositionJauge } from '../hooks/bande'
+import { PAR_CAR_BUREAU, dispositionJauge } from '../hooks/bande'
 
 const BANDE = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: true, maxRows: 20, bodyColumns: 120 } } as const
 
 describe('disposition de la jauge sur une ligne', () => {
   const m = [
-    { nom: 'Contexte', pct: '86 %', court: '' },
-    { nom: 'Limite 5 h', pct: '14 %', court: '↻ 2 h 12' },
-    { nom: 'Limite 7 j', pct: '31 %', court: '↻ 5 j 5 h' },
+    { nom: 'Contexte', abrege: 'Contexte', pct: '86 %', court: '' },
+    { nom: 'Limite 5 h', abrege: '5 h', pct: '14 %', court: '↻ 2 h 12' },
+    { nom: 'Limite 7 j', abrege: '7 j', pct: '31 %', court: '↻ 5 j 5 h' },
   ]
   test('large : barres plafonnées, comptes à rebours gardés', async () => {
-    expect(dispositionJauge(200, m, 40, 1)).toEqual({ barre: 20, avecCourt: true })
+    expect(dispositionJauge(200, m, 40, 1)).toEqual({ barre: 20, avecCourt: true, abrege: false })
   })
   test('étroit : les comptes à rebours partent avant que les barres deviennent trop petites', async () => {
-    expect(dispositionJauge(130, m, 40, 1)).toEqual({ barre: 11, avecCourt: false })
+    expect(dispositionJauge(130, m, 40, 1)).toEqual({ barre: 11, avecCourt: false, abrege: false })
   })
-  test('très étroit : jamais moins de 4 colonnes', async () => {
-    expect(dispositionJauge(60, m, 40, 1)).toEqual({ barre: 4, avecCourt: false })
+  test('très étroit : les noms raccourcissent, jamais moins de 4 colonnes de barre', async () => {
+    expect(dispositionJauge(60, m, 40, 1)).toEqual({ barre: 4, avecCourt: false, abrege: true })
   })
-  test('le texte du bureau, plus serré, garde les comptes à rebours là où le terminal les retire', async () => {
-    expect(dispositionJauge(130, m, 40, 0.75)).toEqual({ barre: 10, avecCourt: true })
+  test('cas de la capture (94 colonnes, bureau) : tout tient, comptes à rebours compris', async () => {
+    const capture = [
+      { nom: 'Contexte', abrege: 'Contexte', pct: '33 %', court: '' },
+      { nom: 'Limite 5 h', abrege: '5 h', pct: '18 %', court: '↻ 32 min' },
+      { nom: 'Limite 7 jours', abrege: '7 jours', pct: '32 %', court: '↻ 5 j 3 h' },
+    ]
+    expect(dispositionJauge(94, capture, 0, PAR_CAR_BUREAU)).toEqual({ barre: 7, avecCourt: true, abrege: false })
+  })
+  test('la largeur choisie ne dépasse jamais la place, de 30 à 200 colonnes', async () => {
+    for (const parCar of [1, PAR_CAR_BUREAU]) for (let c = 30; c <= 200; c++) {
+      const d = dispositionJauge(c, m, 0, parCar)
+      const texte = m.reduce((t, x) => {
+        const court = d.avecCourt && x.court ? x.court.length : 0
+        return t + Math.ceil(((d.abrege ? x.abrege : x.nom).length + x.pct.length + court) * parCar) + 2 + (court > 0 ? 1 : 0)
+      }, 0)
+      const total = texte + 3 * (m.length - 1) + d.barre * m.length
+      if (!(d.abrege && d.barre === 4)) expect(total).toBeLessThanOrEqual(c) // le plancher seul peut déborder ; les textes se coupent alors avec « … »
+    }
   })
 })
 
@@ -68,6 +84,19 @@ test('au repos : les boutons sur une ligne, la jauge seule sur la ligne du desso
     expect(bas).toContain('Contexte')
     expect(bas).toContain('Limite 7 jours')
     expect(bas).not.toContain('"Button"')
+    await ui.unmount()
+  }
+})
+
+test('aucun texte de la jauge ne passe à la ligne', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: 1_000_000 })
+  await $.command.run({ command: 'pupitre', args: '' })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
+    const textes = await ui.findAll({ type: 'Text' })
+    expect(textes.length).toBeGreaterThan(5)
+    for (const t of textes) expect(t.props.wrap).toBe('truncate')
     await ui.unmount()
   }
 })

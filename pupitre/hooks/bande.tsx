@@ -10,41 +10,50 @@ export const PX_COL = 8 // pixels par colonne de la bande sur l'application (à 
 export type Elements = Record<string, (props: Record<string, unknown>) => unknown>
 export type Bouton = { cle: string; libelle: string; action: () => void }
 
-export type Morceau = { nom: string; pct: string; court: string }
+export type Morceau = { nom: string; abrege?: string; pct: string; court: string }
 const ECART = 3, BARRE_MAX = 20, BARRE_CONFORT = 6, BARRE_MIN = 4
 
-// Jauge sur une seule ligne : « nom ▰▰▱ 86 % ↻ 2 h 12 » × 3, puis les boutons. Les barres prennent la place
-// qui reste (20 colonnes au plus) ; si elles tombent sous 6, les comptes à rebours passent dans l'info-bulle.
-// parCar : colonnes par caractère (1 au terminal, 0,75 sur le bureau dont la police est plus serrée).
-export function dispositionJauge(colonnes: number, morceaux: readonly Morceau[], placeBoutons: number, parCar: number): { barre: number; avecCourt: boolean } {
+// Colonnes occupées par un caractère sur le bureau : la colonne y fait 8 px (PX_COL) et un caractère environ
+// 7,2 px (mesuré sur une capture, le gras compris) ; 0,95 garde une petite marge.
+export const PAR_CAR_BUREAU = 0.95
+
+// Jauge sur une seule ligne : « nom ▰▰▱ 86 % ↻ 2 h 12 » × 3. Les barres prennent la place qui reste (20 colonnes
+// au plus). Quand la place manque, dans l'ordre : les comptes à rebours « ↻ » quittent la ligne (barres sous 6),
+// puis les noms raccourcissent (« 5 h », « 7 jours »), puis les barres descendent à 4. Les textes ne passent jamais
+// à la ligne : au pire, ils se coupent avec « … ».
+// parCar : colonnes par caractère (1 au terminal, PAR_CAR_BUREAU sur le bureau).
+export function dispositionJauge(colonnes: number, morceaux: readonly Morceau[], placeBoutons: number, parCar: number): { barre: number; avecCourt: boolean; abrege: boolean } {
   const n = morceaux.length
-  if (n === 0) return { barre: 0, avecCourt: false }
-  const texte = (avecCourt: boolean) => morceaux.reduce((t, m) => {
+  if (n === 0) return { barre: 0, avecCourt: false, abrege: false }
+  const texte = (avecCourt: boolean, abrege: boolean) => morceaux.reduce((t, m) => {
     const court = avecCourt && m.court ? m.court.length : 0
-    return t + (m.nom.length + m.pct.length + court) * parCar + 2 + (court > 0 ? 1 : 0)
+    const nom = abrege ? (m.abrege ?? m.nom) : m.nom
+    return t + Math.ceil((nom.length + m.pct.length + court) * parCar) + 2 + (court > 0 ? 1 : 0)
   }, 0)
   const fixe = ECART * (n - 1) + (placeBoutons > 0 ? ECART + placeBoutons : 0)
-  const barre = (avecCourt: boolean) => Math.floor((colonnes - fixe - texte(avecCourt)) / n)
-  const large = barre(true)
-  if (large >= BARRE_CONFORT) return { barre: Math.min(BARRE_MAX, large), avecCourt: true }
-  return { barre: Math.max(BARRE_MIN, Math.min(BARRE_MAX, barre(false))), avecCourt: false }
+  const barre = (avecCourt: boolean, abrege: boolean) => Math.floor((colonnes - fixe - texte(avecCourt, abrege)) / n)
+  for (const avecCourt of [true, false]) {
+    const b = barre(avecCourt, false)
+    if (b >= BARRE_CONFORT) return { barre: Math.min(BARRE_MAX, b), avecCourt, abrege: false }
+  }
+  return { barre: Math.max(BARRE_MIN, Math.min(BARRE_MAX, barre(false, true))), avecCourt: false, abrege: true }
 }
 
-function mesure(T: Elements, surface: string, nom: string, m: Mesure, barre: number, avecCourt: boolean, majLe: number) {
+function mesure(T: Elements, surface: string, nom: string, affiche: string, m: Mesure, barre: number, avecCourt: boolean, majLe: number) {
   const { Box, Text, Svg } = T
   const pct = m.pct ?? 0
   const titre = `${nom} : ${m.detail}`
   const w = Math.max(20, Math.round(barre * PX_COL))
   const court = avecCourt ? (m.court ?? '') : ''
   const dessin = surface === 'terminal' || Svg === undefined
-    ? <Text dimColor>{barreTexte(pct / 100, barre)}</Text>
+    ? <Text dimColor wrap="truncate">{barreTexte(pct / 100, barre)}</Text>
     : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], graine: graineDe(nom), majLe, titre })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} />
   return (
     <Box key={nom} flexDirection="row" alignItems="center" gap={1}>
-      <Text dimColor>{nom}</Text>
+      <Text dimColor wrap="truncate">{affiche}</Text>
       {dessin}
-      <Text bold>{formatPct(m.pct)}</Text>
-      {court ? <Text dimColor>{court}</Text> : null}
+      <Text bold wrap="truncate">{formatPct(m.pct)}</Text>
+      {court ? <Text dimColor wrap="truncate">{court}</Text> : null}
     </Box>
   )
 }
@@ -52,12 +61,12 @@ function mesure(T: Elements, surface: string, nom: string, m: Mesure, barre: num
 // La ligne de la jauge : les trois mesures seules, réparties sur toute la largeur.
 export function dessinerJauge(T: Elements, surface: string, colonnes: number, mesures: Mesures, majLe: number) {
   const { Box } = T
-  const parCar = surface === 'terminal' ? 1 : 0.75
-  const liste: [string, Mesure][] = [['Contexte', mesures.contexte], ['Limite 5 h', mesures.cinqH], ['Limite 7 jours', mesures.septJ]]
-  const { barre, avecCourt } = dispositionJauge(colonnes, liste.map(([nom, m]) => ({ nom, pct: formatPct(m.pct), court: m.court ?? '' })), 0, parCar)
+  const parCar = surface === 'terminal' ? 1 : PAR_CAR_BUREAU
+  const liste: [string, string, Mesure][] = [['Contexte', 'Contexte', mesures.contexte], ['Limite 5 h', '5 h', mesures.cinqH], ['Limite 7 jours', '7 jours', mesures.septJ]]
+  const { barre, avecCourt, abrege } = dispositionJauge(colonnes, liste.map(([nom, court, m]) => ({ nom, abrege: court, pct: formatPct(m.pct), court: m.court ?? '' })), 0, parCar)
   return (
     <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={ECART}>
-      {liste.map(([nom, m]) => mesure(T, surface, nom, m, barre, avecCourt, majLe))}
+      {liste.map(([nom, court, m]) => mesure(T, surface, nom, abrege ? court : nom, m, barre, avecCourt, majLe))}
     </Box>
   )
 }
