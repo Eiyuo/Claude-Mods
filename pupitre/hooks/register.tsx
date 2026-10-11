@@ -6,7 +6,7 @@ import { AUCUN, basculer, lireReglages, type Commande } from './reglages'
 import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP, CONSIGNE_FIL, DEMANDE_CAP } from './textes'
+import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, DEMANDE_CAP, DEMANDE_RELAIS, REPRISE_RELAIS, relaisEcrit } from './textes'
 import { PERIME_MS, autresActives, ficheDe, lireFiche, nomFichier, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
@@ -24,6 +24,7 @@ const suivis = new Map<string, Suivi>()        // 'claude' ou l'agentId
 const noms = new Map<string, string>()         // agentId -> « Sous-agent n · description »
 let numeroAgent = 0
 let consigneSuivante: string[] | null = null // consigne invisible jointe à la prochaine demande envoyée par le mod
+let relaisDepuis: number | null = null // heure du clic sur « Passer le relais », tant que le relais est en cours
 const SEUIL_SON_MS = 30_000 // carillon seulement après un travail de plus de 30 s
 let tourEnCours = false // turn.start ne dit pas qui démarre : on ne remet à zéro qu'au début d'un tour principal
 
@@ -40,6 +41,14 @@ async function majLignes($: Dollar): Promise<void> {
   }
   await update($, lignesA, () => lignes)
   await update($, maintenantA, () => maintenant)
+}
+
+async function lancerRelais($: Dollar): Promise<void> {
+  if (relaisDepuis !== null) return
+  relaisDepuis = await $.clock.now()
+  consigneSuivante = [CONSIGNE_RELAIS]
+  $.ui.toast('Pupitre : relais en cours…')
+  void $.prompt.submit({ text: DEMANDE_RELAIS })
 }
 
 async function nomAgent($: Dollar, agentId: string): Promise<void> {
@@ -194,6 +203,28 @@ export const register: Register = on => {
         })()
       })
     }
+    if (!e.agentId && relaisDepuis !== null) {
+      const debut = relaisDepuis
+      relaisDepuis = null
+      let mtime: number | null = null
+      try { mtime = (await $.fs.stat(`${await $.session.cwd()}/relais.md`)).mtimeMs } catch { mtime = null }
+      if (relaisEcrit(mtime, debut)) {
+        // vider la conversation une fois le tour vraiment fini, hors de ce hook
+        $.clock.after(300, () => {
+          void (async () => {
+            try {
+              await $.command.run({ command: 'clear' })
+              await $.prompt.fill({ text: REPRISE_RELAIS, mode: 'replace' })
+              $.ui.toast('Pupitre : relais passé. Appuie sur Entrée pour reprendre.')
+            } catch {
+              $.ui.toast('Pupitre : relais.md est écrit, mais la conversation n a pas pu être vidée. Tape /clear.')
+            }
+          })()
+        })
+        return next(e)
+      }
+      $.ui.toast("Le relais n'a pas été écrit : la conversation est conservée.")
+    }
     return next(e)
   })
 
@@ -209,6 +240,7 @@ export const register: Register = on => {
     const T = $.ui.resolve(e) as unknown as Elements
     const r = await read($, reglagesA)
     const boutons: Bouton[] = []
+    if (r.relais) boutons.push({ cle: 'relais', libelle: 'Passer le relais', action: () => { void lancerRelais($) } })
     const arbre = dessinerBande(T, e.surface, e.props.bodyColumns, e.props.maxRows, {
       reglages: r,
       mesures: await read($, mesuresA),

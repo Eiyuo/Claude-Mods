@@ -18,3 +18,19 @@ export const CONSIGNE_CAP =
   "AskUserQuestion : prochaine étape, priorité, ce qu'on laisse de côté, et toute autre décision encore ouverte. Chaque " +
   "question a des options concrètes ; place ta recommandation en premier, avec « (Recommandé) » à la fin de son libellé. " +
   "Ensuite, reprends le travail sur le cap choisi, sans redemander."
+
+export const DEMANDE_RELAIS = 'Passer le relais : écris relais.md.'
+export const CONSIGNE_RELAIS =
+  "Passer le relais. Écris le fichier relais.md à la racine du projet ouvert (remplace-le s'il existe), en français, " +
+  "avec ces parties : la date ; où on en est ; ce qui a été fait ; ce qui reste à faire ; les décisions prises et pourquoi ; " +
+  "les contraintes et règles à respecter ; les blocages et problèmes ; les fichiers clés ; la prochaine action précise. " +
+  "Écris-le pour qu'une conversation neuve, qui n'a rien vu, puisse reprendre exactement là. N'y mets ni identifiant " +
+  "d'entreprise ni nom réel de l'utilisateur. Puis, si le dossier est un dépôt git, enregistre-le : git add relais.md, " +
+  "puis git commit -m \"docs: relais\" ; n'envoie rien sur le dépôt distant. Si ce n'est pas un dépôt git, dis-le. " +
+  "Réponds ensuite en une seule ligne."
+export const REPRISE_RELAIS =
+  "Lis relais.md à la racine du projet et reprends là où on s'est arrêtés. Commence par me résumer en 3 lignes où on en est."
+
+export function relaisEcrit(mtimeMs: number | null, debut: number): boolean {
+  return mtimeMs !== null && mtimeMs >= debut
+}
