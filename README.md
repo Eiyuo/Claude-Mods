@@ -106,7 +106,12 @@ Le symbole **↻** donne le temps avant la remise à zéro. Chaque texte tient s
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 
-Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ». À gauche, « Cache 82 % » : la part de ta dernière demande déjà gardée en mémoire chez Anthropic, donc moins chère et plus rapide.
+Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ». À gauche, le cache (par exemple « Cache 99 % »).
+
+**Le cache.** À chaque réponse, Claude ne se souvient de rien tout seul : toute la conversation lui est renvoyée (ses consignes, les messages précédents, les fichiers lus). Pour ne pas tout retraiter à chaque fois, Anthropic garde un moment en mémoire le début de la conversation qui n'a pas changé : c'est le cache. Le pourcentage donne la part de ta dernière demande qui venait de ce cache.
+- **Un chiffre haut (souvent 99 %) est le bon cas** : d'un message à l'autre, seuls ton nouveau message et les derniers résultats sont nouveaux. Les réponses sont plus rapides, et la partie relue depuis le cache coûte beaucoup moins cher.
+- **Il baisse normalement** au début d'une conversation, après un `/clear` ou un relais (rien n'est encore en mémoire), après une longue pause (le cache expire) ou quand tu changes de modèle.
+- **Un chiffre bas qui se répète** au milieu d'une conversation qui avance normalement est le seul signe à surveiller : le travail est alors refait trop souvent.
 
 ### Le fil (`/fil`)
 
