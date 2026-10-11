@@ -10,34 +10,55 @@ export const PX_COL = 8 // pixels par colonne de la bande sur l'application (à 
 export type Elements = Record<string, (props: Record<string, unknown>) => unknown>
 export type Bouton = { cle: string; libelle: string; action: () => void }
 
-function mesure(T: Elements, surface: string, nom: string, m: Mesure, largeurCol: number, majLe: number) {
+export type Morceau = { nom: string; pct: string; court: string }
+const ECART = 3, BARRE_MAX = 20, BARRE_CONFORT = 6, BARRE_MIN = 4
+
+// Jauge sur une seule ligne : « nom ▰▰▱ 86 % ↻ 2 h 12 » × 3, puis les boutons. Les barres prennent la place
+// qui reste (20 colonnes au plus) ; si elles tombent sous 6, les comptes à rebours passent dans l'info-bulle.
+// parCar : colonnes par caractère (1 au terminal, 0,75 sur le bureau dont la police est plus serrée).
+export function dispositionJauge(colonnes: number, morceaux: readonly Morceau[], placeBoutons: number, parCar: number): { barre: number; avecCourt: boolean } {
+  const n = morceaux.length
+  if (n === 0) return { barre: 0, avecCourt: false }
+  const texte = (avecCourt: boolean) => morceaux.reduce((t, m) => {
+    const court = avecCourt && m.court ? m.court.length : 0
+    return t + (m.nom.length + m.pct.length + court) * parCar + 2 + (court > 0 ? 1 : 0)
+  }, 0)
+  const fixe = ECART * (n - 1) + (placeBoutons > 0 ? ECART + placeBoutons : 0)
+  const barre = (avecCourt: boolean) => Math.floor((colonnes - fixe - texte(avecCourt)) / n)
+  const large = barre(true)
+  if (large >= BARRE_CONFORT) return { barre: Math.min(BARRE_MAX, large), avecCourt: true }
+  return { barre: Math.max(BARRE_MIN, Math.min(BARRE_MAX, barre(false))), avecCourt: false }
+}
+
+function mesure(T: Elements, surface: string, nom: string, m: Mesure, barre: number, avecCourt: boolean, majLe: number) {
   const { Box, Text, Svg } = T
   const pct = m.pct ?? 0
-  const barre = surface === 'terminal' || Svg === undefined
-    ? <Text dimColor>{barreTexte(pct / 100, Math.max(6, largeurCol - 2))}</Text>
-    : <Svg source={svgSimple({ largeur: largeurCol * PX_COL, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], graine: graineDe(nom), majLe })} alt={`${nom} : ${formatPct(m.pct)}`} isInteractive />
+  const titre = `${nom} : ${m.detail}`
+  const w = Math.max(20, Math.round(barre * PX_COL))
+  const court = avecCourt ? (m.court ?? '') : ''
+  const dessin = surface === 'terminal' || Svg === undefined
+    ? <Text dimColor>{barreTexte(pct / 100, barre)}</Text>
+    : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], graine: graineDe(nom), majLe, titre })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} isInteractive />
   return (
-    <Box flexDirection="column" flexGrow={1}>
-      <Box flexDirection="row" justifyContent="space-between">
-        <Text dimColor>{nom}</Text>
-        <Text bold>{formatPct(m.pct)}</Text>
-      </Box>
-      {barre}
-      <Text dimColor wrap="truncate">{m.detail}</Text>
+    <Box key={nom} flexDirection="row" alignItems="center" gap={1}>
+      <Text dimColor>{nom}</Text>
+      {dessin}
+      <Text bold>{formatPct(m.pct)}</Text>
+      {court ? <Text dimColor>{court}</Text> : null}
     </Box>
   )
 }
 
 export function dessinerJauge(T: Elements, surface: string, colonnes: number, mesures: Mesures, montrerMesures: boolean, boutons: readonly Bouton[], majLe: number) {
   const { Box, Button } = T
-  const placeBoutons = boutons.reduce((n, b) => n + b.libelle.length + 6, 0)
-  const largeurCol = Math.max(10, Math.floor((colonnes - placeBoutons) / 3) - 2)
+  const parCar = surface === 'terminal' ? 1 : 0.75
+  const placeBoutons = boutons.reduce((n, b) => n + Math.ceil(b.libelle.length * parCar) + 4, 0)
+  const liste: [string, Mesure][] = montrerMesures ? [['Contexte', mesures.contexte], ['Limite 5 h', mesures.cinqH], ['Limite 7 jours', mesures.septJ]] : []
+  const { barre, avecCourt } = dispositionJauge(colonnes, liste.map(([nom, m]) => ({ nom, pct: formatPct(m.pct), court: m.court ?? '' })), placeBoutons, parCar)
   return (
-    <Box flexDirection="row" gap={2} alignItems="flex-end">
-      {montrerMesures && mesure(T, surface, 'Contexte', mesures.contexte, largeurCol, majLe)}
-      {montrerMesures && mesure(T, surface, 'Limite 5 h', mesures.cinqH, largeurCol, majLe)}
-      {montrerMesures && mesure(T, surface, 'Limite 7 jours', mesures.septJ, largeurCol, majLe)}
-      {boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}
+    <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={ECART}>
+      {liste.length > 0 ? <Box flexDirection="row" alignItems="center" gap={ECART}>{liste.map(([nom, m]) => mesure(T, surface, nom, m, barre, avecCourt, majLe))}</Box> : null}
+      {boutons.length > 0 ? <Box flexDirection="row" alignItems="center" gap={1}>{boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}</Box> : null}
     </Box>
   )
 }
@@ -53,9 +74,10 @@ function ligne(T: Elements, surface: string, colonnes: number, l: LigneFil, main
   const { Box, Text, Svg } = T
   const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4)
   const fin = l.finiLe ?? maintenant
+  const w = Math.max(40, Math.round(largeur * PX_COL))
   const barre = surface === 'terminal' || Svg === undefined
     ? <Text color={TEXTE_NIVEAU[l.niveau]}>{barreTexte(l.progression, largeur - l.mot.length - 1)} {l.mot}</Text>
-    : <Svg key={`b-${l.id}`} source={svgFil({ largeur: largeur * PX_COL, progression: l.progression, avant: l.avant, niveau: l.niveau, niveauAvant: l.niveauAvant, fini: l.fini, eclat: l.eclat, mot: l.mot, graine: graineDe(l.id), majLe: l.majLe })} alt={`${l.qui} : ${l.tache}, ${l.compteur}`} isInteractive />
+    : <Svg key={`b-${l.id}`} source={svgFil({ largeur: w, progression: l.progression, avant: l.avant, niveau: l.niveau, niveauAvant: l.niveauAvant, fini: l.fini, eclat: l.eclat, mot: l.mot, graine: graineDe(l.id), majLe: l.majLe })} alt={`${l.qui} : ${l.tache}, ${l.compteur}`} width={w} height={22} isInteractive />
   return (
     <Box key={`l-${l.id}`} flexDirection="row" gap={1} alignItems="flex-end">
       <Box width={COL_QUI}><Text dimColor wrap="truncate">{l.qui}</Text></Box>
@@ -75,9 +97,11 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   const lignes = s.reglages.fil ? (maxRows < 8 ? s.lignes.filter(l => l.id === 'claude') : s.lignes) : []
   const autres = s.reglages.fil ? s.autres : []
   if (!jauge && lignes.length === 0 && autres.length === 0) return null
+  const barreJauge = jauge ? dessinerJauge(T, surface, colonnes, s.mesures, s.reglages.jauge && maxRows >= 3, s.boutons, s.majJauge) : null
+  if (lignes.length === 0 && autres.length === 0) return barreJauge // au repos : une seule ligne
   return (
     <Box flexDirection="column" gap={1}>
-      {jauge && dessinerJauge(T, surface, colonnes, s.mesures, s.reglages.jauge && maxRows >= 6, s.boutons, s.majJauge)}
+      {barreJauge}
       {lignes.map(l => ligne(T, surface, colonnes, l, s.maintenant))}
       {autres.length > 0 && dessinerAutres(T, surface, colonnes, autres, s.maintenant)}
     </Box>
@@ -87,6 +111,7 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
 export function dessinerAutres(T: Elements, surface: string, colonnes: number, autres: readonly Autre[], maintenant: number) {
   const { Box, Text, Svg } = T
   const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4)
+  const w = Math.max(20, Math.round(largeur * PX_COL))
   return (
     <Box flexDirection="column">
       <Text dimColor>Autres discussions en cours</Text>
@@ -97,7 +122,7 @@ export function dessinerAutres(T: Elements, surface: string, colonnes: number, a
             <Text dimColor wrap="truncate">{a.tache}</Text>
             {surface === 'terminal' || Svg === undefined
               ? <Text dimColor>{barreTexte(a.progression, largeur)}</Text>
-              : <Svg source={svgSimple({ largeur: largeur * PX_COL, hauteur: 10, cellule: 2, rayon: 4, progression: a.progression, palette: PALETTES_FIL[a.niveau]!, graine: graineDe(a.id), majLe: a.majLe })} alt={`${a.titre} : ${a.tache}`} isInteractive />}
+              : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: a.progression, palette: PALETTES_FIL[a.niveau]!, graine: graineDe(a.id), majLe: a.majLe })} alt={`${a.titre} : ${a.tache}`} width={w} height={10} isInteractive />}
           </Box>
           <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{a.compteur}</Text></Box>
           <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono(maintenant - a.debut)}</Text></Box>

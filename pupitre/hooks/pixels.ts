@@ -192,6 +192,7 @@ export function svgFil(o: OptionsFil): string {
 export type OptionsSimple = {
   largeur: number; hauteur: number; cellule: number; rayon: number
   progression: number; palette: readonly string[]; graine: number; majLe: number
+  titre?: string // info-bulle au survol (l'élément Svg interactif affiche les <title>)
 }
 
 function dessinerSimple(o: OptionsSimple, c: number): string {
@@ -205,6 +206,7 @@ function dessinerSimple(o: OptionsSimple, c: number): string {
     fond.case(teinte(o.palette, x / Math.max(fin, 1), false, i, j, rows), `s${Math.floor(bruit(k + 5, o.graine) * 8)}`, x, j * c, Math.min(c, fin - x), c)
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
+    (o.titre ? `<title>${echapper(o.titre)}</title>` : '') +
     `<style>${CSS_COMMUN(o.majLe)}</style>` +
     `<defs><clipPath id="p"><rect width="${W}" height="${H}" rx="${o.rayon}"/></clipPath><clipPath id="q"><rect width="${fin}" height="${H}"/></clipPath></defs>` +
     `<rect width="${W}" height="${H}" rx="${o.rayon}" fill="rgba(128,128,128,.12)" stroke="rgba(128,128,128,.35)" stroke-width=".5"/>` +

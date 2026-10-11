@@ -74,3 +74,9 @@ describe('svgSimple et texte', () => {
     expect(graineDe('claude')).not.toBe(graineDe('agent-2'))
   })
 })
+
+test('svgSimple : info-bulle échappée quand un titre est donné', async () => {
+  const o = { largeur: 120, hauteur: 10, cellule: 2, rayon: 4, progression: 0.4, palette: PALETTES_FIL[0]!, graine: 1, majLe: 0 }
+  expect(svgSimple(o)).not.toContain('<title>')
+  expect(svgSimple({ ...o, titre: 'Limite 5 h : <remise> & co' })).toContain('<title>Limite 5 h : &lt;remise&gt; &amp; co</title>')
+})

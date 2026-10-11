@@ -2,9 +2,9 @@ import type { Mesure, Mesures } from '../types'
 
 export const TIRET = '—'
 export const MESURES_VIDES: Mesures = {
-  contexte: { pct: null, detail: TIRET },
-  cinqH: { pct: null, detail: TIRET },
-  septJ: { pct: null, detail: TIRET },
+  contexte: { pct: null, detail: TIRET, court: '' },
+  cinqH: { pct: null, detail: TIRET, court: '' },
+  septJ: { pct: null, detail: TIRET, court: '' },
 }
 
 export function kilo(n: number): string {
@@ -25,6 +25,13 @@ export function dureeAvant(resetsAt: string | undefined, maintenant: number): st
   return `remise à zéro dans ${Math.floor(h / 24)} j ${h % 24} h`
 }
 
+// Forme courte pour la ligne unique de la jauge : « ↻ 1 h 52 » ; la phrase entière va dans l'info-bulle.
+export function dureeCourte(resetsAt: string | undefined, maintenant: number): string {
+  const d = dureeAvant(resetsAt, maintenant)
+  if (!d) return ''
+  return d === 'remise à zéro imminente' ? '↻ imminente' : `↻ ${d.replace('remise à zéro dans ', '')}`
+}
+
 export function formatPct(pct: number | null): string {
   return pct === null ? TIRET : `${Math.round(pct)} %`
 }
@@ -36,8 +43,8 @@ export type UsageLu = {
 
 function limite(u: UsageLu, kind: string, maintenant: number): Mesure {
   const l = u.rateLimits.find(r => r.kind === kind)
-  if (!l) return { pct: null, detail: TIRET }
-  return { pct: l.percentUsed, detail: dureeAvant(l.resetsAt, maintenant) || TIRET }
+  if (!l) return { pct: null, detail: TIRET, court: '' }
+  return { pct: l.percentUsed, detail: dureeAvant(l.resetsAt, maintenant) || TIRET, court: dureeCourte(l.resetsAt, maintenant) }
 }
 
 export function lireMesures(u: UsageLu, maintenant: number): Mesures {
@@ -46,7 +53,7 @@ export function lireMesures(u: UsageLu, maintenant: number): Mesures {
   const pct = brut === null ? null : Math.round(brut * 10) / 10 // 42, pas 41.99999999999999
   const detail = c.tokens !== undefined ? `${kilo(c.tokens)} / ${kilo(c.window)} jetons` : `fenêtre de ${kilo(c.window)} jetons`
   return {
-    contexte: { pct, detail },
+    contexte: { pct, detail, court: '' },
     cinqH: limite(u, 'five_hour', maintenant),
     septJ: limite(u, 'seven_day', maintenant),
   }

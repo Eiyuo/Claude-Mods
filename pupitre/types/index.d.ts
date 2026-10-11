@@ -1,5 +1,5 @@
 export type Reglages = { jauge: boolean; fil: boolean; cap: boolean; relais: boolean; plume: boolean }
-export type Mesure = { pct: number | null; detail: string }
+export type Mesure = { pct: number | null; detail: string; court: string }
 export type Mesures = { contexte: Mesure; cinqH: Mesure; septJ: Mesure }
 export type Niveau = 0 | 1 | 2 | 3
 export type LigneFil = {
