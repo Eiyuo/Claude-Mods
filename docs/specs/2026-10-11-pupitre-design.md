@@ -50,7 +50,7 @@ Les maquettes validées ont été montrées dans la conversation. Elles ne sont 
   - `tool.call` signale chaque outil appelé, avec `agentId` pour un sous-agent (absent pour Claude).
   - `agent.spawn` signale le lancement d'un sous-agent.
   - Les outils `TaskCreate`, `TaskUpdate` et `TodoWrite` portent les listes de tâches.
-- **La zone de saisie.** `$.prompt.read()` lit le brouillon, `$.prompt.fill({ text, mode })` le remplace. `$.prompt.submit()` envoie une demande. Un hook `prompt.submit` peut y ajouter un `context` invisible.
+- **La zone de saisie.** `$.prompt.read()` lit le brouillon, `$.prompt.fill({ text, mode })` le remplace. `$.prompt.submit()` envoie une demande ; le moteur refuse un envoi fait depuis un `command.run`, et retire le `context` joint à la demande d'un mod. Le mod envoie donc juste après la commande, et sa consigne passe par `prompt.compose` le temps du tour suivant.
 - **Les commandes.**
   - `$.command.register` déclare une commande, et un hook `command.run` y répond.
   - `$.command.run({ command: 'clear' })` lance `/clear`.
@@ -220,7 +220,7 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 ## 10. /cap, /relais, /plume
 
 ### /cap
-- **Déclenchement.** Taper `/cap` envoie une courte demande visible (« /cap — fixer le cap »). Elle est accompagnée d'une consigne invisible (`context`) : relire la conversation, puis poser de 1 à 4 questions avec la fenêtre à choix.
+- **Déclenchement.** Taper `/cap` envoie une courte demande visible (« /cap — fixer le cap »). Elle est accompagnée d'une consigne invisible, ajoutée au prompt système le temps de ce tour (`prompt.compose`) : relire la conversation, puis poser de 1 à 4 questions avec la fenêtre à choix.
 - **Questions.** Prochaine étape, priorité, ce qu'on laisse de côté, et toute autre décision ouverte. Chacune a des options concrètes et une option recommandée.
 - **Ensuite.** Je reprends le travail sur le cap choisi.
 

@@ -25,7 +25,10 @@ let derniereUsage: UsageLu | null = null
 const suivis = new Map<string, Suivi>()        // 'claude' ou l'agentId
 const noms = new Map<string, string>()         // agentId -> « Sous-agent n · description »
 let numeroAgent = 0
-let consigneSuivante: string[] | null = null // consigne invisible jointe à la prochaine demande envoyée par le mod
+// Consigne d'une demande du mod (/cap, relais). Le moteur retire le contexte joint à l'envoi d'un mod : elle passe donc
+// par le prompt système, le temps du tour suivant (en attente jusqu'à son début, active jusqu'à sa fin).
+let consigneAttente: string | null = null
+let consigneTour: string | null = null
 let relaisDepuis: number | null = null // heure du clic sur « Passer le relais », tant que le relais est en cours
 const SEUIL_SON_MS = 30_000 // carillon seulement après un travail de plus de 30 s
 let tourEnCours = false // turn.start ne dit pas qui démarre : on ne remet à zéro qu'au début d'un tour principal
@@ -45,12 +48,27 @@ async function majLignes($: Dollar): Promise<void> {
   await update($, maintenantA, () => maintenant)
 }
 
+// Envoie une demande du mod hors du hook qui l'appelle : le moteur refuse un envoi fait depuis un command.run (il
+// attendrait le tour que ce hook tient). Si l'envoi échoue quand même, la demande attend dans la zone de texte ;
+// la consigne, elle, attend le prochain tour.
+function envoyer($: Dollar, texte: string, consigne: string): void {
+  consigneAttente = consigne
+  $.clock.after(0, () => {
+    void (async () => {
+      let refus: string | undefined
+      try { refus = (await $.prompt.submit({ text: texte })).drop } catch (err) { refus = String(err) }
+      if (refus === undefined) return
+      const { isFilled } = await $.prompt.fill({ text: texte, mode: 'replace' })
+      $.ui.toast(isFilled ? 'Pupitre : appuie sur Entrée pour envoyer la demande.' : `Pupitre : la demande n'a pas pu partir (${refus}).`)
+    })()
+  })
+}
+
 async function lancerRelais($: Dollar): Promise<void> {
   if (relaisDepuis !== null) return
   relaisDepuis = await $.clock.now()
-  consigneSuivante = [CONSIGNE_RELAIS]
   $.ui.toast('Pupitre : relais en cours…')
-  void $.prompt.submit({ text: DEMANDE_RELAIS })
+  envoyer($, DEMANDE_RELAIS, CONSIGNE_RELAIS)
 }
 
 async function capacites($: Dollar): Promise<Capacite[]> {
@@ -215,11 +233,19 @@ export const register: Register = on => {
 
   on('prompt.compose', async ($, e, next) => {
     const r = await next(e)
-    if (!(await read($, reglagesA)).fil) return r
-    return { ...r, sections: [...r.sections, { id: 'pupitre-fil', text: CONSIGNE_FIL, scope: 'session' as const }] }
+    const ajouts = [
+      ...((await read($, reglagesA)).fil ? [{ id: 'pupitre-fil', text: CONSIGNE_FIL }] : []),
+      ...(consigneTour ? [{ id: 'pupitre-consigne', text: consigneTour }] : []),
+    ]
+    if (ajouts.length === 0) return r
+    return { ...r, sections: [...r.sections, ...ajouts.map(a => ({ ...a, scope: 'session' as const }))] }
   })
 
   on('turn.start', async ($, e, next) => {
+    if (!tourEnCours) {
+      consigneTour = consigneAttente
+      consigneAttente = null
+    }
     if (!tourEnCours && (await read($, reglagesA)).fil) {
       tourEnCours = true
       const maintenant = await $.clock.now()
@@ -254,7 +280,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId ?? 'claude'
-    if (!e.agentId) tourEnCours = false
+    if (!e.agentId) { tourEnCours = false; consigneTour = null }
     if (!e.agentId && e.durationMs > SEUIL_SON_MS && !e.isAborted && (await read($, reglagesA)).fil) {
       void carillon($).catch(() => { /* pas de sortie audio */ })
     }
@@ -342,18 +368,8 @@ export const register: Register = on => {
     return arbre === null ? next(e) : (arbre as never)
   })
 
-  on('prompt.submit', async ($, e, next) => {
-    if (consigneSuivante) {
-      const c = consigneSuivante
-      consigneSuivante = null
-      return next({ ...e, context: [...(e.context ?? []), ...c] })
-    }
-    return next(e)
-  }).catch(($, e, next) => next(e)) // ne jamais bloquer une demande
-
   on('command.run', { command: 'cap' }, async $ => {
-    consigneSuivante = [CONSIGNE_CAP]
-    void $.prompt.submit({ text: DEMANDE_CAP })
+    envoyer($, DEMANDE_CAP, CONSIGNE_CAP)
     return { text: 'Pupitre : je prépare mes questions sur la suite.' }
   })
 

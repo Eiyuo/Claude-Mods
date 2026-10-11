@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import { PAR_CAR_BUREAU, dispositionJauge } from '../hooks/bande'
+import { CONSIGNE_CAP, DEMANDE_CAP } from '../hooks/textes'
 
 const BANDE = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: true, maxRows: 20, bodyColumns: 120 } } as const
 
@@ -187,6 +188,31 @@ test('chaque image porte l heure de son dessin : redessinée, son animation ne r
   expect(svgs.length).toBe(4)
   for (const s of svgs) expect(String(s.props.source)).toContain('--t:-1002.50s')
   await ui.unmount()
+})
+
+test('/cap : la demande part toute seule, et sa consigne accompagne ce tour-là seulement', async ($, on) => {
+  const envoyes: string[] = []
+  on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
+  on('prompt.compose', async () => ({ sections: [] }) as never)
+  const horloge = await preparer($, on)
+  const consigne = async () => (await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: [], tools: [], outputStyle: null, traits: [] } as never)).sections.some(s => s.text === CONSIGNE_CAP)
+  await $.command.run({ command: 'cap', args: '' })
+  await horloge.advance(10)
+  expect(envoyes).toEqual([DEMANDE_CAP])
+  await $.turn.start({ text: DEMANDE_CAP, turnId: 't2' } as never)
+  expect(await consigne()).toBe(true)
+  await $.turn.complete({ answer: '', durationMs: 5000, isAborted: false, turnId: 't2', reason: 'answer' } as never)
+  expect(await consigne()).toBe(false)
+})
+
+test('/cap : si la demande ne part pas, elle attend dans la zone de texte', async ($, on) => {
+  const remplis: string[] = []
+  on('prompt.submit', async () => ({ drop: 'session occupée' }) as never)
+  on('prompt.fill', async ($, e) => { remplis.push(e.text); return { isFilled: true } as never })
+  const horloge = await preparer($, on)
+  await $.command.run({ command: 'cap', args: '' })
+  await horloge.advance(10)
+  expect(remplis).toEqual([DEMANDE_CAP])
 })
 
 test('carillon : sous Windows, c est PowerShell qui joue le son du mod (le moteur n y joue rien)', async ($, on) => {
