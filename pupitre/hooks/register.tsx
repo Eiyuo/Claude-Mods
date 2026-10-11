@@ -23,6 +23,7 @@ let derniereUsage: UsageLu | null = null
 const suivis = new Map<string, Suivi>()        // 'claude' ou l'agentId
 const noms = new Map<string, string>()         // agentId -> « Sous-agent n · description »
 let numeroAgent = 0
+const SEUIL_SON_MS = 30_000 // carillon seulement après un travail de plus de 30 s
 let tourEnCours = false // turn.start ne dit pas qui démarre : on ne remet à zéro qu'au début d'un tour principal
 
 async function majLignes($: Dollar): Promise<void> {
@@ -176,6 +177,9 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId ?? 'claude'
     if (!e.agentId) tourEnCours = false
+    if (!e.agentId && e.durationMs > SEUIL_SON_MS && !e.isAborted && (await read($, reglagesA)).fil) {
+      void $.audio.play({ asset: 'assets/carillon.wav' }).catch(() => { /* pas de sortie audio */ })
+    }
     const s = suivis.get(id)
     if (s && s.fin === null) {
       const maintenant = await $.clock.now()
