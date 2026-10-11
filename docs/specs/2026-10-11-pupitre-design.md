@@ -109,7 +109,7 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 - **Réglages (proposition A, retenue le 11/10/2026).** Un bouton « Réglages » au bout de la ligne des boutons déplie, juste en dessous, la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · Tout éteindre (ou Tout allumer) · Replier ». Un clic bascule la fonction sans message ; si tout s'éteint, la ligne se replie, la bande disparaît et un message rappelle `/pupitre`. La ligne des boutons reste affichée tant qu'une fonction est allumée, pour que « Réglages » reste accessible. État déplié : `$.state` `reglagesOuverts`.
 - **Taille des barres.** Chaque `Svg` reçoit `width` et `height` : sans eux, le bureau donne 150 px de haut au cadre interactif.
 - **Affichage.** Rien ne s'affiche quand tout est éteint, ou quand /fil n'a rien à montrer et que la jauge est éteinte.
-- **Pas de redessin à vide.** La bande n'est redessinée que quand une valeur change : nouvelle mesure, tâche, étape, sous-agent, autre session, ou chaque seconde pour le chrono quand /fil est actif. Le scintillement et le reflet tournent seuls dans le SVG.
+- **Pas de redessin à vide.** La bande n'est redessinée que quand une valeur change : nouvelle mesure, tâche, étape, sous-agent, autre session, ou chaque seconde pour le chrono quand /fil est actif. Le scintillement et le reflet tournent seuls dans le SVG. Le bureau peut recharger l'image à chaque dessin : chaque SVG porte donc l'heure de son dessin (`--t`, pour les boucles) et le temps écoulé depuis le dernier changement (`--u`, pour les effets joués une fois). Ainsi, ses animations reprennent où elles en étaient, sans revenir en arrière.
 - **Survey.** Quand `hasSurvey` est vrai, la bande cède la place.
 - **Hauteur.** Si `maxRows` est trop petit (moins de 3), la jauge ne garde que ses boutons ; sous 8, /fil ne montre plus que la ligne de Claude.
 
@@ -215,7 +215,7 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 
 - **Fin.** Quand la réponse se termine, tout passe au vert et reste affiché. Une croix, au bout de la première ligne, retire les barres /fil : `Button` de `label` « × ». Le bureau ne dessine d'un `Button` que son `label` : ni son contenu, ni `role: 'dismiss'` dans cette bande (vérifié sur capture le 11/10/2026). Limite : le moteur n'offre pas de nom accessible distinct du libellé, la croix est donc annoncée « × » ; sinon elles sont remplacées à la demande suivante (demande du 11/10/2026).
 - **Rechargement.** Au démarrage de la session (ou au rechargement du mod), les lignes /fil en cours sont retirées (on ne peut plus les suivre) ; les lignes finies restent, avec leur croix.
-- **Son.** Le carillon `assets/carillon.wav` est joué si la réponse a duré plus de 30 s. C'est un carillon doux de 2 notes (mi puis la, environ 0,6 s, sons sinusoïdaux qui s'atténuent), fabriqué par `outils/carillon.py`. Rien n'est téléchargé.
+- **Son.** Le carillon `assets/carillon.wav` est joué si la réponse a duré plus de 30 s. C'est un carillon doux de 2 notes (mi puis la, environ 0,6 s, sons sinusoïdaux qui s'atténuent), fabriqué par `outils/carillon.py`. Rien n'est téléchargé. Le moteur ne joue de son que sur macOS : sous Windows, le mod fait lire le fichier par PowerShell (`Media.SoundPlayer`).
 
 ## 10. /cap, /relais, /plume
 
