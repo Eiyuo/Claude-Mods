@@ -20,19 +20,28 @@ export const CONSIGNE_CAP_AUTO =
   "pour la suite du travail ; place ta recommandation en premier, avec « (Recommandé) » à la fin de son libellé. Ne la " +
   "pose pas si tu poses déjà une autre question ou si le travail n'est pas fini."
 
+// relais.md reste sur l'ordinateur : publié avec le dépôt, il exposerait la conversation et les règles de l'utilisateur.
 export function consigneRelais(sessionId: string): string {
-  return "Passer le relais. Écris le fichier relais.md à la racine du projet ouvert (remplace-le s'il existe), en français. " +
+  return "Passer le relais. Écris le fichier relais.md à la racine du projet ouvert (remplace-le s'il existe), en français, " +
+    "en 80 lignes au plus, sans récit. " +
     `Première ligne : <!-- Conversation d'origine : claude --resume ${sessionId} -->. Deuxième ligne : « STATUT : À REPRENDRE », ` +
     "ou « STATUT : ATTENDRE » si la suite dépend d'une décision de l'utilisateur. Puis la date, et ces parties : Objectif ; " +
-    "Contraintes permanentes (les règles à toujours respecter) ; Ce qui a été fait ; État actuel ; Décisions prises et " +
-    "pourquoi ; Prochaines étapes (la première, précise) ; Blocages ; Fichiers clés. Écris-le pour qu'une conversation " +
-    "neuve, qui n'a rien vu, puisse reprendre exactement là. N'y mets ni identifiant d'entreprise ni nom réel de " +
-    "l'utilisateur. Puis, si le dossier est un dépôt git, enregistre-le : git add relais.md, puis git commit -m \"docs: relais\" ; " +
-    "n'envoie rien sur le dépôt distant. Si ce n'est pas un dépôt git, dis-le. Réponds ensuite en une seule ligne."
+    "Contraintes permanentes (les règles à toujours respecter) ; Dernière demande de l'utilisateur (mot pour mot) ; " +
+    "Ce qui a été fait ; État actuel (vérifié juste avant d'écrire, pas de mémoire : git status, branche, avance sur le dépôt " +
+    "distant, dernier commit, résultat des tests) ; Comment vérifier (les commandes exactes de test et de validation) ; " +
+    "Décisions prises et pourquoi ; Pistes écartées (déjà essayées, à ne pas refaire) ; Prochaines étapes (la première, " +
+    "précise ; si le STATUT est ATTENDRE, la question exacte à poser à l'utilisateur et ses options) ; Blocages ; Fichiers " +
+    "clés (chemins relatifs au projet). Écris-le pour qu'une conversation neuve, qui n'a rien vu, puisse reprendre exactement " +
+    "là. N'y mets ni identifiant d'entreprise, ni nom réel de l'utilisateur, ni chemin de son dossier personnel (écris ~ à la " +
+    "place). Ne l'enregistre pas dans git et n'envoie rien sur le dépôt distant : si le dossier est un dépôt git où relais.md " +
+    "n'est pas encore ignoré, ajoute la ligne relais.md à .git/info/exclude (exclusion propre à cet ordinateur, le projet " +
+    "n'est pas modifié) ; s'il est déjà suivi par git, signale-le. Réponds ensuite en une seule ligne."
 }
 export const REPRISE_RELAIS =
-  "Lis relais.md à la racine du projet et résume-moi en 3 lignes où on en est. Si son STATUT est ATTENDRE, arrête-toi là " +
-  "et attends ma décision ; sinon, reprends à « Prochaines étapes », sans refaire ce qui est déjà fait."
+  "Lis relais.md à la racine du projet et résume-moi en 3 lignes où on en est. Vérifie d'abord que l'état décrit est " +
+  "toujours vrai (git status, dernier commit) et signale tout écart. Si son STATUT est ATTENDRE, pose-moi la question en " +
+  "attente avec ses options, puis attends ma décision ; sinon, reprends à « Prochaines étapes », sans refaire ce qui est " +
+  "déjà fait ni les « Pistes écartées »."
 
 export function relaisEcrit(mtimeMs: number | null, debut: number): boolean {
   return mtimeMs !== null && mtimeMs >= debut

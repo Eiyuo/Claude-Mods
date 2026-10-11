@@ -18,13 +18,17 @@ test('/cap automatique : Claude finit par la question « Et maintenant ? » et 3
   for (const mot of ['AskUserQuestion', 'Et maintenant, on fait quoi ?', '3 suites', '(Recommandé)']) expect(CONSIGNE_CAP_AUTO).toContain(mot)
 })
 
-test('/relais : consigne complète, avec la conversation d origine, sans identité, sans push', async () => {
+test('/relais : consigne complète et vérifiée, sans identité ni chemin personnel, jamais dans git', async () => {
   const c = consigneRelais('abc-123')
-  for (const mot of ['relais.md', 'claude --resume abc-123', 'STATUT', 'Objectif', 'Contraintes permanentes', 'Ce qui a été fait', 'État actuel', 'Décisions', 'Prochaines étapes', 'Blocages', 'Fichiers clés', 'git commit']) {
+  for (const mot of ['relais.md', 'claude --resume abc-123', 'STATUT', 'Objectif', 'Contraintes permanentes', 'Dernière demande', 'mot pour mot',
+    'Ce qui a été fait', 'État actuel', 'git status', 'Comment vérifier', 'Décisions', 'Pistes écartées', 'Prochaines étapes', 'question exacte',
+    'Blocages', 'Fichiers clés', '80 lignes', 'dossier personnel', '.git/info/exclude']) {
     expect(c).toContain(mot)
   }
+  expect(c).not.toContain('git add')
+  expect(c).not.toContain('git commit')
   expect(c).toContain("n'envoie rien")
-  for (const mot of ['relais.md', 'STATUT', 'ATTENDRE', 'Prochaines étapes']) expect(REPRISE_RELAIS).toContain(mot)
+  for (const mot of ['relais.md', 'STATUT', 'ATTENDRE', 'question', 'Prochaines étapes', 'git status', 'Pistes écartées']) expect(REPRISE_RELAIS).toContain(mot)
 })
 test('/relais : la conversation n est vidée que si relais.md a été écrit pendant le relais', async () => {
   expect(relaisEcrit(null, 1000)).toBe(false)

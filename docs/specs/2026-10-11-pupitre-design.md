@@ -32,7 +32,7 @@ Recréer, dans un seul mod Claude Code, cinq fonctions vues dans une vidéo, san
 | /fil, son | Carillon doux de 2 notes à la fin d'une réponse, **seulement si elle a pris plus de 30 s** |
 | /jauge, couleurs | Vert sous 50 % (large), jaune de 50 à 75 % (à surveiller), orange de 75 à 90 % (ça presse), rouge au-delà (critique). Partie remplie pleine, sans trous |
 | /cap | Seulement quand on tape /cap |
-| /relais | `relais.md` à la racine du projet ouvert, **enregistré dans git** (commit local ; l'envoi sur GitHub reste à la demande) |
+| /relais | `relais.md` à la racine du projet ouvert, **jamais enregistré dans git** (exclusion locale ; changé le 11/10/2026 : le commit l'avait rendu public) |
 | /plume | **Remplace** le texte de la zone de saisie. Un bouton « Revenir à mon texte » reste disponible 30 s |
 
 Les maquettes validées ont été montrées dans la conversation. Elles ne sont pas conservées : ce document les décrit.
@@ -229,14 +229,13 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 - **Ensuite.** Je reprends le travail sur le cap choisi.
 
 ### /relais (bouton « Passer le relais »)
-1. **La demande.** Le bouton envoie la demande « Passer le relais », qui contient toute la consigne : écrire `relais.md` à la racine du projet ouvert, puis l'enregistrer dans git.
-   - Contenu de `relais.md` : date ; où on en est ; ce qui a été fait ; ce qui reste à faire ; décisions prises (et pourquoi) ; contraintes et règles à respecter ; blocages et problèmes ; fichiers clés ; prochaine action précise.
-   - Il ne contient ni l'identifiant d'entreprise ni le nom réel de l'utilisateur.
-   - L'enregistrement dans git est un commit `docs: relais`, sans envoi sur GitHub.
+1. **La demande.** Le bouton envoie la demande « Passer le relais », qui contient toute la consigne : écrire `relais.md` à la racine du projet ouvert (80 lignes au plus).
+   - Contenu de `relais.md` : voir §11 ; l'état actuel est vérifié juste avant d'écrire (git status, branche, avance sur le dépôt distant, dernier commit, tests), pas de mémoire.
+   - Il ne contient ni identifiant d'entreprise, ni nom réel, ni chemin du dossier personnel de l'utilisateur.
+   - **Jamais dans git** (décision du 11/10/2026, après la publication par erreur d'un `relais.md`) : s'il n'est pas déjà ignoré, Claude l'ajoute à `.git/info/exclude`, exclusion propre à l'ordinateur qui ne modifie pas le projet. S'il est déjà suivi, Claude le signale. Pour reprendre ailleurs, on copie le fichier.
 2. **La vérification.** À la fin de cette réponse, le mod vérifie que `relais.md` a été modifié pendant la réponse.
-   - **Oui :** il lance `/clear`, puis met dans la zone de saisie : « Lis relais.md à la racine du projet et reprends là où on s'est arrêtés. Commence par me résumer en 3 lignes où on en est. »
+   - **Oui :** il lance `/clear`, puis met dans la zone de saisie la phrase de reprise : vérifier que l'état décrit est toujours vrai, résumer en 3 lignes, puis reprendre aux prochaines étapes, ou poser la question en attente si le statut est ATTENDRE.
    - **Non :** il ne vide rien et affiche « Le relais n'a pas été écrit : la conversation est conservée. »
-3. **Hors projet git.** `relais.md` est écrit quand même. Le commit est sauté, et la réponse le signale.
 
 ### /plume (bouton « Améliorer le prompt »)
 1. **Lecture du brouillon** (`$.prompt.read()`). S'il est vide : « Écris d'abord ta demande. »
@@ -260,7 +259,7 @@ Elles remplacent ce qui, plus haut, les contredit.
 - **Cache.** À la fin de chaque réponse, `turn.complete` donne `usage` : « Cache 82 % » (lu dans le cache / entrée totale) s'affiche à gauche de la ligne des boutons quand la jauge est allumée.
 - **/cap automatique.** `/cap` bascule `cap`, comme les autres commandes. Allumé, un `prompt.submit` joint `CONSIGNE_CAP_AUTO` au `context` de chaque message de l'utilisateur (sauf une commande « / ») : à la fin du travail, Claude pose « Et maintenant, on fait quoi ? » avec AskUserQuestion et 3 suites. Vérifié dans le terminal : le contexte d'un message de l'utilisateur arrive à Claude, alors que le prompt système d'un mod (`prompt.compose`, `prompt.context`) n'est pas consulté.
 - **Relais au bon moment.** Réglage `{ seuil, auto }` gardé dans `$.store` (clé `relais`), seuil de 30 à 90 % par pas de 5, 60 % par défaut. À chaque `session.measure`, au-delà du seuil : le bouton devient « Passer le relais · 62 % » et une notification prévient une fois par dépassement ; en automatique, le relais se lance s'il n'y a pas de tour en cours.
-- **relais.md.** Première ligne `<!-- Conversation d'origine : claude --resume <id> -->`, puis `STATUT : À REPRENDRE` ou `ATTENDRE`, puis Objectif, Contraintes permanentes, Ce qui a été fait, État actuel, Décisions, Prochaines étapes, Blocages, Fichiers clés. La phrase de reprise repart des prochaines étapes, ou attend si le statut est ATTENDRE.
+- **relais.md.** Première ligne `<!-- Conversation d'origine : claude --resume <id> -->`, puis `STATUT : À REPRENDRE` ou `ATTENDRE`, puis Objectif, Contraintes permanentes, Dernière demande (mot pour mot), Ce qui a été fait, État actuel (vérifié), Comment vérifier, Décisions, Pistes écartées, Prochaines étapes (avec la question exacte si ATTENDRE), Blocages, Fichiers clés (chemins relatifs). La phrase de reprise vérifie l'état, puis repart des prochaines étapes, ou pose la question en attente si le statut est ATTENDRE.
 
 ## 11. Cas particuliers et limites
 

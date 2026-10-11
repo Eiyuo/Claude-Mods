@@ -97,17 +97,21 @@ Quand la conversation devient longue (jauge « Contexte » qui se remplit), cliq
    - un statut : « À REPRENDRE », ou « ATTENDRE » si la suite dépend d'une décision de ta part ;
    - l'objectif ;
    - les contraintes permanentes ;
+   - ta dernière demande, mot pour mot ;
    - ce qui a été fait ;
-   - l'état actuel ;
-   - les décisions prises, et pourquoi ;
-   - les prochaines étapes ;
+   - l'état actuel, vérifié juste avant d'écrire (git, tests) plutôt que de mémoire ;
+   - comment vérifier (les commandes exactes de test) ;
+   - les décisions prises, et pourquoi, et les pistes déjà écartées ;
+   - les prochaines étapes (et, si le statut est « ATTENDRE », la question exacte à te poser) ;
    - les blocages ;
    - les fichiers clés.
-2. Il l'enregistre dans git (commit), sans l'envoyer sur GitHub. Pour l'envoyer, demande-le, comme d'habitude.
-3. La conversation est vidée, et la zone de texte est préremplie avec la phrase de reprise : Claude résume en 3 lignes où on en est, puis reprend aux prochaines étapes sans refaire ce qui est fait (ou attend ta décision si le statut est « ATTENDRE »).
+
+   80 lignes au plus, sans ton nom, ton identifiant d'entreprise ni le chemin de ton dossier personnel.
+2. **`relais.md` n'est jamais enregistré dans git** : il reste sur ton ordinateur (Claude l'exclut de git pour cet ordinateur seulement, sans modifier le projet). Ainsi, il ne peut pas partir sur GitHub avec le reste.
+3. La conversation est vidée, et la zone de texte est préremplie avec la phrase de reprise : Claude vérifie que l'état décrit est toujours vrai, résume en 3 lignes où on en est, puis reprend aux prochaines étapes sans refaire ce qui est fait (ou te pose la question en attente si le statut est « ATTENDRE »).
 4. Tu n'as plus qu'à appuyer sur Entrée : la nouvelle conversation repart avec tout l'essentiel, et une mémoire neuve.
 
-Comme `relais.md` est dans git, tu peux passer le relais au bureau, faire `git pull` chez toi et reprendre exactement au même endroit.
+Pour reprendre sur un autre ordinateur, copie `relais.md` à la racine du projet là-bas.
 
 Si `relais.md` n'a pas pu être écrit, la conversation n'est pas vidée et un message te prévient.
 
