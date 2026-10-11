@@ -68,6 +68,55 @@ describe('svgFil', () => {
   })
 })
 
+describe('animations : attente, tête de lecture, vague, fanfare, alerte', () => {
+  const FINI = { ...BASE, progression: 1, avant: 0.6, niveau: 3 as const, niveauAvant: 2 as const, fini: true, eclat: true }
+  test('tête de lecture : les pixels colorés du bord clignotent et lâchent des pixels, seulement pendant le travail', async () => {
+    expect(svgFil(BASE)).toMatch(/<path class="h0" fill="#(?!FFFFFF)/)
+    expect(svgFil(BASE)).toContain('class="v"')
+    expect(svgFil({ ...FINI, eclat: false })).not.toMatch(/class="h\d"/)
+  })
+  test('en attente : rien de changé depuis 20 s, la barre s assoupit, sans reflet ni tête', async () => {
+    const s = svgFil({ ...BASE, majLe: 0, maintenant: 20_000 })
+    expect(s).toContain('class="z"')
+    expect(s).not.toContain('class="r"')
+    expect(s).not.toMatch(/class="h\d"/)
+    expect(svgFil({ ...BASE, majLe: 0, maintenant: 19_999 })).not.toContain('class="z"')
+    expect(svgFil({ ...FINI, majLe: 0, maintenant: 60_000 })).not.toContain('class="z"')
+  })
+  test('vague de couleur : au changement de niveau, l ancienne couleur part de gauche à droite', async () => {
+    const s = svgFil({ ...BASE, progression: 0.7, avant: 0.5, niveau: 2, niveauAvant: 1 })
+    expect(s).toContain('class="f0"')
+    expect(s).not.toMatch(/class="d\d"/)
+  })
+  test('fin en fanfare : un flash suit la vague jusqu au bout, puis des confettis en arc', async () => {
+    expect(svgFil(FINI)).toContain('class="w0"')
+    expect(svgFil(FINI)).toContain('class="w59"')
+    expect(svgFil(FINI)).toContain('--up:')
+    expect(svgFil({ ...FINI, eclat: false })).not.toContain('class="w0"')
+  })
+  test('jauge critique : battement de cœur seulement en alerte', async () => {
+    const o = { largeur: 200, hauteur: 10, cellule: 2, rayon: 4, progression: 0.93, palette: PALETTES_FIL[0]!, graine: 1, maintenant: 0 }
+    expect(svgSimple({ ...o, alerte: true })).toContain('class="c"')
+    expect(svgSimple(o)).not.toContain('class="c"')
+  })
+})
+
+describe('rendu comme la maquette : pixels nets, bande de lumière, étiquette discrète', () => {
+  const JAUGE = { largeur: 200, hauteur: 10, cellule: 2, rayon: 4, progression: 0.6, palette: PALETTES_FIL[0]!, graine: 1, maintenant: 0 }
+  test('pixels nets et opaques : bords francs, plus de respiration transparente', async () => {
+    for (const s of [svgFil(BASE), svgSimple(JAUGE)]) {
+      expect(s).toContain('shape-rendering="crispEdges"')
+      expect(s).not.toContain('respire')
+    }
+  })
+  test('éclat : une bande de lumière balaie la partie remplie pixel par pixel, puis marque une pause', async () => {
+    for (const s of [svgFil(BASE), svgSimple(JAUGE)]) expect(s).toMatch(/animation:reflet \d+ms steps\(\d+\)/)
+  })
+  test('étiquette discrète : plus petite et un peu transparente', async () => {
+    expect(svgFil(BASE)).toContain('height="12" rx="3" fill-opacity=".8"')
+  })
+})
+
 describe('svgSimple et texte', () => {
   test('jauge pleine et sous la limite', async () => {
     const s = svgSimple({ largeur: 400, hauteur: 10, cellule: 2, rayon: 4, progression: 0.93, palette: ['#E66E6E', '#DE5A5A', '#D64545', '#C43737'], graine: 1, maintenant: 11_000 })

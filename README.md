@@ -53,7 +53,7 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 
 - un point (« ✓ » quand c'est fini) ;
 - le début de ta demande, par exemple « Analyse le dossier radar… » ;
-- la barre : des pixels colorés qui scintillent, un reflet qui la traverse, et une étiquette au bout, avec l'étape en un mot (Lecture, Recherche, Écriture, Commande, Délégation, Web, Question, Réflexion…) ;
+- la barre : des pixels nets, du clair au foncé, une bande de lumière qui la balaie, un bord qui clignote tant que ça travaille, et une petite étiquette au bout, avec l'étape en un mot (Lecture, Recherche, Écriture, Commande, Délégation, Web, Question, Réflexion…) ;
 - le pourcentage et le temps écoulé ;
 - la croix **×**, une fois le travail fini. Sa place est gardée sur chaque ligne : toutes les barres ont la même longueur.
 
@@ -66,7 +66,9 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 | 0 à 33 % | Violet |
 | 33 à 66 % | Bleu |
 | 66 à 99 % | Turquoise |
-| Terminé | Vert, avec « ✓ Fini » et une petite gerbe de pixels |
+| Terminé | Vert, avec « ✓ Fini », un flash et des confettis de pixels |
+
+Quand la barre change de couleur, la nouvelle avance de gauche à droite. **Si rien n'a bougé depuis 20 secondes** (Claude attend ta réponse, une permission, ou réfléchit longuement), la barre pâlit et respire lentement : un coup d'œil suffit pour voir qu'il faut peut-être aller voir.
 
 **Où.** Les barres du fil s'affichent au-dessus de la jauge.
 
@@ -78,7 +80,7 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 
 **Le son.** Un carillon doux de deux notes sonne quand Claude a fini, si la réponse a pris plus de 30 secondes. Pas de son pour les réponses rapides.
 
-Si Windows demande moins d'animations, le scintillement, le reflet et la gerbe sont coupés ; les barres restent lisibles.
+Si Windows demande moins d'animations, les étincelles, la bande de lumière, le bord qui clignote, le flash, les confettis et le battement de la jauge sont coupés ; les barres restent lisibles, et une barre en attente reste simplement pâle.
 
 ### Fixer le cap (`/cap`)
 

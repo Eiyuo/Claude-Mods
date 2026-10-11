@@ -25,7 +25,7 @@ Recréer, dans un seul mod Claude Code, cinq fonctions vues dans une vidéo, san
 | Rangement | Dépôt GitHub public `Eiyuo/Claude-Mods`, à part des projets de travail. Installé une fois sur chaque PC, il vaut pour tous les projets |
 | /fil, ce qui est mesuré | Tâches finies sur tâches prévues, une ligne pour Claude et une par sous-agent (option 3) |
 | /fil, autres fenêtres | Une ligne fine par autre discussion qui travaille (option 1) |
-| /fil, style | Celui du curseur d'effort « Ultracode » de l'application : piste claire, pixels colorés, curseur. Dans la version « Après » : trame ordonnée, relief, scintillement doux, reflet en biais, apparition des pixels |
+| /fil, style | Celui du curseur d'effort « Ultracode » de l'application : piste claire, pixels colorés, curseur. Dans la version « Après » : trame ordonnée, pixels nets et plats, bande de lumière, apparition des pixels (rendu aligné le 11/10 sur la maquette des 7 idées d'animation) |
 | /fil, couleurs | Violet de 0 à 33 %, bleu de 33 à 66 %, turquoise de 66 à 99 %, **vert quand c'est terminé** |
 | /fil, curseur | Il prend la couleur foncée de la barre et contient **un mot** décrivant l'étape en cours, en blanc |
 | /fil, sous-agents | Même barre que Claude |
@@ -109,7 +109,7 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 - **Réglages (proposition A, retenue le 11/10/2026).** Un bouton « Réglages » au bout de la ligne des boutons déplie, juste en dessous, la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · Tout éteindre (ou Tout allumer) · Replier ». Un clic bascule la fonction sans message ; si tout s'éteint, la ligne se replie, la bande disparaît et un message rappelle `/pupitre`. La ligne des boutons reste affichée tant qu'une fonction est allumée, pour que « Réglages » reste accessible. État déplié : `$.state` `reglagesOuverts`.
 - **Taille des barres.** Chaque `Svg` reçoit `width` et `height` : sans eux, le bureau donne 150 px de haut au cadre interactif.
 - **Affichage.** Rien ne s'affiche quand tout est éteint, ou quand /fil n'a rien à montrer et que la jauge est éteinte.
-- **Pas de redessin à vide.** La bande n'est redessinée que quand une valeur change : nouvelle mesure, tâche, étape, sous-agent, autre session, ou chaque seconde pour le chrono quand /fil est actif. Le scintillement et le reflet tournent seuls dans le SVG. Le bureau peut recharger l'image à chaque dessin : chaque SVG porte donc l'heure de son dessin (`--t`, pour les boucles) et le temps écoulé depuis le dernier changement (`--u`, pour les effets joués une fois). Ainsi, ses animations reprennent où elles en étaient, sans revenir en arrière.
+- **Pas de redessin à vide.** La bande n'est redessinée que quand une valeur change : nouvelle mesure, tâche, étape, sous-agent, autre session, ou chaque seconde pour le chrono quand /fil est actif. La bande de lumière et les étincelles tournent seules dans le SVG. Le bureau peut recharger l'image à chaque dessin : chaque SVG porte donc l'heure de son dessin (`--t`, pour les boucles) et le temps écoulé depuis le dernier changement (`--u`, pour les effets joués une fois). Ainsi, ses animations reprennent où elles en étaient, sans revenir en arrière.
 - **Survey.** Quand `hasSurvey` est vrai, la bande cède la place.
 - **Hauteur.** Si `maxRows` est trop petit (moins de 3), la jauge ne garde que ses boutons ; sous 8, /fil ne montre plus que la ligne de Claude.
 
@@ -133,29 +133,32 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 | Rouge (jauge) | #E66E6E · #DE5A5A · #D64545 · #C43737 |
 
 **Disposition, version « Après ».**
-- **Dégradé en trame.** Du clair au foncé en allant vers le bord avant, par une trame ordonnée (matrice de Bayer 4 × 4) qui choisit entre deux nuances voisines. Quand c'est terminé, le dégradé est uniforme.
-- **Relief.** La rangée du haut est éclaircie de 16 %, celle du bas assombrie de 12 %.
+- **Dégradé en trame.** Des 4 nuances entières, de la plus claire à la plus foncée en allant vers le bord avant, par une trame ordonnée (matrice de Bayer 4 × 4) qui choisit entre deux nuances voisines. Quand c'est terminé, le dégradé est uniforme.
+- **Pixels nets et plats.** Pas de relief, pixels opaques, bords francs (`shape-rendering="crispEdges"`) : pas de flou ni de trait entre les pixels quand Windows agrandit l'affichage.
 - **Bord avant.** Les 10 derniers pixels sont éclaircis, jusqu'à +22 %.
+- **Étiquette discrète.** 12 px de haut, texte de 10 px, fond à 80 % d'opacité : les pixels se devinent dessous.
 
 **Animation** (CSS dans le SVG, seulement `opacity`, `transform` et `fill`) :
 
 | Effet | Détail |
 |---|---|
-| Scintillement | Chaque pixel varie doucement en clarté (±6 %), avec sa propre période (de 1,2 à 2,8 s) et son propre décalage |
 | Étincelles | Environ 2 % des pixels, au hasard : un éclat blanc de 400 ms, toutes les 1,6 s |
-| Reflet | Une bande en biais (pente de 6 % de la hauteur), au bord tramé, qui traverse la partie remplie en 4,6 s. Le décalage entre lignes évite qu'elles se reflètent ensemble |
+| Bande de lumière | 15 colonnes blanches sur toute la hauteur, 40 % au centre et moins sur les bords, qui balaient la partie remplie colonne par colonne (une toutes les 18 ms), puis une pause : cycle de 2,6 s au moins |
 | Apparition | Quand la barre avance, les nouvelles colonnes apparaissent pixel par pixel (décalage de 0 à 220 ms), avec un éclat qui s'éteint en 260 ms |
-| Changement de couleur | Fondu pixel par pixel (décalage de 0 à 650 ms) |
-| Fin (/fil) | Le vert balaie la barre de gauche à droite (450 ms + 160 ms de décalage), une gerbe de 16 pixels verts jaillit du curseur (700 ms), et le curseur fait un petit « pop » (500 ms) |
+| Changement de couleur | Vague : l'ancienne couleur s'efface en 60 tranches de gauche à droite, 15 ms d'écart (0,9 s sur toute la barre), comme à la fin |
+| Tête de lecture (/fil) | Pendant le travail, les pixels des 2 dernières colonnes clignotent (100 % → 20 %, 900 ms, décalés par rangée) et 4 pixels s'en détachent vers la droite sur 22 px (1,3 s) |
+| En attente (/fil) | Rien de changé depuis 20 s (outil, étape, %) : la barre pâlit et respire lentement (3,4 s), sans reflet, étincelles ni tête. Ne vaut pas pour les autres discussions, dont la fiche est réécrite toutes les 6 s |
+| Fin (/fil) | Le vert balaie la barre comme la vague, avec un flash blanc (75 %) sur le front, puis 18 confettis partent en arc depuis le bout et retombent (900 ms, sans sortir des 18 px), et le curseur fait un petit « pop » (500 ms) |
+| Jauge critique | Barre rouge (90 % et plus) : double battement blanc toutes les 1,6 s |
 
 **Le dessin n'est pas une page vivante.** Quand la barre change, le SVG est regénéré. Pour que ça reste fluide, chaque nouveau dessin démarre depuis l'ancien état :
 - le curseur glisse depuis son ancienne position, avec une courbe souple à léger rebond, en 500 ms ;
 - les nouvelles colonnes apparaissent comme décrit plus haut ;
 - les pixels qui changent de couleur partent de l'ancienne.
 
-**Taille.** Un SVG doit rester sous 131 072 caractères. Au-delà, les pixels passent à 4 px (puis 5 px), et le scintillement est regroupé par classes CSS partagées (8 rythmes) au lieu d'un style par pixel.
+**Taille.** Un SVG doit rester sous 131 072 caractères. Au-delà, les pixels passent à 4 px (puis 5 px). Les pixels sont regroupés par couleur et par classe CSS partagée au lieu d'un style par pixel.
 
-**Moins d'animations.** Si l'option « afficher les animations » de Windows est coupée (`prefers-reduced-motion`), le scintillement, les étincelles, le reflet et la gerbe disparaissent. Seuls les fondus restent.
+**Moins d'animations.** Si l'option « afficher les animations » de Windows est coupée (`prefers-reduced-motion`), les étincelles, la bande de lumière, la tête de lecture, le flash, les confettis et le battement disparaissent. Seuls les fondus restent ; une barre en attente reste pâle, sans respirer.
 
 ## 8. /jauge
 

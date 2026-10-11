@@ -47,7 +47,7 @@ function mesure(T: Elements, surface: string, nom: string, affiche: string, m: M
   const court = avecCourt ? (m.court ?? '') : ''
   const dessin = surface === 'terminal' || Svg === undefined
     ? <Text dimColor wrap="truncate">{barreTexte(pct / 100, barre)}</Text>
-    : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], graine: graineDe(nom), maintenant, titre })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} />
+    : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], alerte: couleurJauge(pct) === 'rouge', graine: graineDe(nom), maintenant, titre })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} />
   return (
     <Box key={nom} flexDirection="row" alignItems="center" gap={1}>
       <Text dimColor wrap="truncate">{affiche}</Text>
