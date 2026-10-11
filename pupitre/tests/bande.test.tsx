@@ -69,7 +69,7 @@ test('chaque barre a sa largeur et sa hauteur fixées (sinon le bureau lui donne
   await ui.unmount()
 })
 
-test('au repos : les boutons sur une ligne, la jauge seule sur la ligne du dessous', async ($, on) => {
+test('au repos : la jauge seule sur une ligne, les boutons sur la ligne du dessous', async ($, on) => {
   mock.store(on)
   mock.clock(on, { now: 1_000_000 })
   await $.command.run({ command: 'pupitre', args: '' })
@@ -79,11 +79,11 @@ test('au repos : les boutons sur une ligne, la jauge seule sur la ligne du desso
     expect(arbre.props.flexDirection).toBe('column')
     expect(arbre.children).toHaveLength(2)
     const [haut, bas] = arbre.children.map(c => JSON.stringify(c))
-    expect(haut).toContain('Réglages')
-    expect(haut).not.toContain('Contexte')
-    expect(bas).toContain('Contexte')
-    expect(bas).toContain('Limite 7 jours')
-    expect(bas).not.toContain('"Button"')
+    expect(haut).toContain('Contexte')
+    expect(haut).toContain('Limite 7 jours')
+    expect(haut).not.toContain('"Button"')
+    expect(bas).toContain('Réglages')
+    expect(bas).not.toContain('Contexte')
     await ui.unmount()
   }
 })
@@ -126,7 +126,7 @@ async function preparer($: any, on: any) {
   return horloge
 }
 
-test('la jauge reste en bas, au plus près de la zone de texte ; /fil au-dessus', async ($, on) => {
+test('/fil au-dessus de la jauge, les boutons en dessous', async ($, on) => {
   await preparer($, on)
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
@@ -137,22 +137,28 @@ test('la jauge reste en bas, au plus près de la zone de texte ; /fil au-dessus'
   const t = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE })
   const texte = JSON.stringify(await t.drawn())
   expect(texte.indexOf('Claude')).toBeLessThan(texte.indexOf('Contexte'))
+  expect(texte.indexOf('Contexte')).toBeLessThan(texte.indexOf('Réglages'))
   await t.unmount()
 })
 
-test('travail fini : la barre reste, avec « Fermer », jusqu à ce qu on la ferme', async ($, on) => {
+test('travail fini : la barre reste, avec une croix « Fermer », jusqu à ce qu on la ferme', async ($, on) => {
   const horloge = await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   await $.tool.call({ tool: 'Read', input: { file_path: 'a.md' }, agentId: 'a1' } as never)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
-  expect(await ui.find({ type: 'Button', text: 'Fermer' })).toBeUndefined() // pas pendant le travail
+  const croix = async () => (await ui.findAll({ type: 'Button' })).filter(b => b.key === 'fermer-fil')
+  expect(await croix()).toHaveLength(0) // pas pendant le travail
   await $.turn.complete({ answer: '', durationMs: 5000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
   await horloge.advance(10_000)
   const avant = JSON.stringify(await ui.drawn())
   expect(avant).toContain('Claude')
   expect(avant).toContain('Sous-agent')
-  expect(await ui.findAll({ type: 'Button', text: 'Fermer' })).toHaveLength(1)
+  const [x, ...autresCroix] = await croix()
+  expect(autresCroix).toHaveLength(0)
+  expect(x!.props.label).toBe('Fermer') // nom accessible
+  expect(JSON.stringify(x)).toContain('×') // ce qui est dessiné : une simple croix
+  expect(JSON.stringify(x)).not.toContain('dismiss') // une croix dans la ligne /fil, pas la fermeture de toute la bande
   await ui.press({ key: 'fermer-fil' })
   const apres = JSON.stringify(await ui.drawn())
   expect(apres).not.toContain('Claude')

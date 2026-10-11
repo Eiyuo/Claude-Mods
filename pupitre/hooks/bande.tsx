@@ -71,7 +71,7 @@ export function dessinerJauge(T: Elements, surface: string, colonnes: number, me
   )
 }
 
-// La ligne des boutons, au-dessus de la jauge, calée à droite.
+// La ligne des boutons, sous la jauge, calée à droite.
 export function dessinerBoutons(T: Elements, boutons: readonly Bouton[]) {
   const { Box, Button } = T
   return (
@@ -84,7 +84,7 @@ export function dessinerBoutons(T: Elements, boutons: readonly Bouton[]) {
 export type EtatBande = {
   reglages: Reglages; mesures: Mesures; lignes: readonly LigneFil[]; autres: readonly Autre[]
   maintenant: number; boutons: readonly Bouton[]; majJauge: number
-  fermer?: () => void // « Fermer » : retire les barres /fil une fois le travail fini
+  fermer?: () => void // croix « Fermer » : retire les barres /fil une fois le travail fini
   reglage?: ActionsReglage // ligne « Pupitre : ✓ Jauge ✓ Fil … », dépliée par le bouton « Réglages »
 }
 
@@ -122,7 +122,7 @@ function ligne(T: Elements, surface: string, colonnes: number, l: LigneFil, main
       </Box>
       <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{l.compteur}</Text></Box>
       <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono(fin - l.debut)}</Text></Box>
-      {fermer ? <Button key="fermer-fil" label="Fermer" onPress={() => fermer()} /> : null}
+      {fermer ? <Button key="fermer-fil" label="Fermer" onPress={() => fermer()}>×</Button> : null}
     </Box>
   )
 }
@@ -133,15 +133,15 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   const lignes = s.reglages.fil ? (maxRows < 8 ? s.lignes.filter(l => l.id === 'claude') : s.lignes) : []
   const autres = s.reglages.fil ? s.autres : []
   if (!jauge && lignes.length === 0 && autres.length === 0) return null
-  // « Fermer » sur la première ligne /fil, une fois que tout est fini
+  // croix « Fermer » sur la première ligne /fil, une fois que tout est fini
   const fermer = s.fermer && lignes.length > 0 && lignes.every(l => l.fini) ? s.fermer : undefined
-  // de haut en bas : autres discussions, /fil, réglages dépliés, boutons, puis la jauge, toujours au plus près de la zone de texte
+  // de haut en bas : autres discussions, /fil, la jauge, les boutons, puis les réglages dépliés sous « Réglages »
   const rangs = [
     autres.length > 0 ? dessinerAutres(T, surface, colonnes, autres, s.maintenant) : null,
     ...lignes.map((l, i) => ligne(T, surface, colonnes, l, s.maintenant, i === 0 ? fermer : undefined)),
-    jauge && s.reglage?.ouvert ? dessinerReglages(T, s.reglages, s.reglage) : null,
-    jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons) : null,
     s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.majJauge) : null,
+    jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons) : null,
+    jauge && s.reglage?.ouvert ? dessinerReglages(T, s.reglages, s.reglage) : null,
   ].filter(r => r !== null)
   if (rangs.length === 1) return rangs[0]
   return <Box flexDirection="column" gap={1}>{rangs}</Box>

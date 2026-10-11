@@ -23,11 +23,11 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 À chaque changement, un petit message confirme ce qui est allumé ou éteint, par exemple « Pupitre : fil éteint ». Les réglages sont gardés d'une session à l'autre.
 
-**Sans taper de commande : le bouton « Réglages ».** Il est au bout de la ligne des boutons. Un clic déplie juste au-dessus la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · Tout éteindre · Replier ». Chaque bouton allume (✓) ou éteint (○) sa fonction ; « Replier » range la ligne. Si tu éteins tout, la bande disparaît : tape `/pupitre` pour la rallumer.
+**Sans taper de commande : le bouton « Réglages ».** Il est au bout de la ligne des boutons. Un clic déplie juste en dessous la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · Tout éteindre · Replier ». Chaque bouton allume (✓) ou éteint (○) sa fonction ; « Replier » range la ligne. Si tu éteins tout, la bande disparaît : tape `/pupitre` pour la rallumer.
 
 ### La jauge (`/jauge`)
 
-Une seule ligne juste au-dessus de la zone de texte, avec trois petites barres :
+Une seule ligne, avec trois petites barres :
 
 - **Contexte** : la part de la mémoire de conversation de Claude déjà remplie (par exemple « 42 % · 84 k / 200 k jetons »). Quand elle approche de 100 %, Claude commence à oublier le début : c'est le moment de passer le relais.
 - **Limite 5 h** : ta consommation sur la fenêtre de 5 heures, et le temps avant sa remise à zéro.
@@ -45,7 +45,7 @@ Le symbole **↻** donne le temps avant la remise à zéro. Chaque texte tient s
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 
-Juste au-dessus de la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ».
+Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ».
 
 ### Le fil (`/fil`)
 
@@ -66,11 +66,11 @@ Juste au-dessus de la jauge, une ligne de boutons, calée à droite : ceux de `/
 | 66 à 99 % | Turquoise |
 | Terminé | Vert, avec « ✓ Fini » et une petite gerbe de pixels |
 
-**Où.** Les barres du fil s'affichent au-dessus de la jauge : la jauge reste toujours au plus près de la zone de texte.
+**Où.** Les barres du fil s'affichent au-dessus de la jauge.
 
 **Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa propre ligne, avec la même barre. S'il finit pendant que Claude travaille encore, sa ligne disparaît 4 secondes après.
 
-**À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. Le bouton **« Fermer »**, au bout de la ligne de Claude, les retire. Sinon, elles sont remplacées à ta demande suivante.
+**À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. La croix **×** au bout de la ligne de Claude (nommée « Fermer » pour les lecteurs d'écran) les retire. Sinon, elles sont remplacées à ta demande suivante.
 
 **Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît en haut de la bande sur une ligne fine, sous « Autres discussions en cours ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre.
 
