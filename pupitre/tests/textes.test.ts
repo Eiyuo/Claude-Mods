@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, REPRISE_RELAIS, SYSTEME_PLUME, chrono, nettoyerReponse, promptPlume, relaisEcrit } from '../hooks/textes'
+import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, chrono, nettoyerReponse, promptPlume, relaisEcrit } from '../hooks/textes'
 
 describe('textes', () => {
   test('la consigne /fil demande une liste de tâches à Claude et aux sous-agents', async () => {
@@ -14,18 +14,17 @@ describe('textes', () => {
   })
 })
 
-test('/cap : consigne', async () => {
-  expect(CONSIGNE_CAP).toContain('AskUserQuestion')
-  expect(CONSIGNE_CAP).toContain('1 à 4')
-  expect(CONSIGNE_CAP).toContain('(Recommandé)')
+test('/cap automatique : Claude finit par la question « Et maintenant ? » et 3 suites', async () => {
+  for (const mot of ['AskUserQuestion', 'Et maintenant, on fait quoi ?', '3 suites', '(Recommandé)']) expect(CONSIGNE_CAP_AUTO).toContain(mot)
 })
 
-test('/relais : consigne complète, sans identité, sans push', async () => {
-  for (const mot of ['relais.md', 'où on en est', 'ce qui a été fait', 'ce qui reste à faire', 'décisions', 'contraintes', 'blocages', 'fichiers clés', 'prochaine action', 'git commit']) {
-    expect(CONSIGNE_RELAIS).toContain(mot)
+test('/relais : consigne complète, avec la conversation d origine, sans identité, sans push', async () => {
+  const c = consigneRelais('abc-123')
+  for (const mot of ['relais.md', 'claude --resume abc-123', 'STATUT', 'Objectif', 'Contraintes permanentes', 'Ce qui a été fait', 'État actuel', 'Décisions', 'Prochaines étapes', 'Blocages', 'Fichiers clés', 'git commit']) {
+    expect(c).toContain(mot)
   }
-  expect(CONSIGNE_RELAIS).toContain("n'envoie rien")
-  expect(REPRISE_RELAIS).toContain('relais.md')
+  expect(c).toContain("n'envoie rien")
+  for (const mot of ['relais.md', 'STATUT', 'ATTENDRE', 'Prochaines étapes']) expect(REPRISE_RELAIS).toContain(mot)
 })
 test('/relais : la conversation n est vidée que si relais.md a été écrit pendant le relais', async () => {
   expect(relaisEcrit(null, 1000)).toBe(false)

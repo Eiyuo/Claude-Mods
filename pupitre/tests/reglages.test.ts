@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { AUCUN, basculer, jaugeVisible, lireReglages, toutAllume } from '../hooks/reglages'
+import { AUCUN, basculer, changerSeuil, jaugeVisible, lireRelais, lireReglages, toutAllume } from '../hooks/reglages'
 
 describe('réglages', () => {
   test('/pupitre allume tout quand tout est éteint', async () => {
@@ -38,5 +38,17 @@ describe('réglages', () => {
     expect(jaugeVisible({ ...AUCUN, plume: true })).toBe(true)
     expect(jaugeVisible({ ...AUCUN, jauge: true })).toBe(true)
     expect(jaugeVisible({ ...AUCUN, fil: true })).toBe(true) // le bouton « Réglages » doit rester accessible
+    expect(jaugeVisible({ ...AUCUN, cap: true })).toBe(true)
+  })
+  test('/cap allume ou éteint le cap automatique', async () => {
+    expect(basculer(AUCUN, 'cap')).toEqual({ reglages: { ...AUCUN, cap: true }, message: 'Pupitre : cap automatique allumé' })
+  })
+  test('seuil du relais : 60 % par défaut, de 30 à 90 % par pas de 5', async () => {
+    expect(lireRelais(undefined)).toEqual({ seuil: 60, auto: false })
+    expect(lireRelais({ seuil: 75, auto: true })).toEqual({ seuil: 75, auto: true })
+    expect(lireRelais({ seuil: 12, auto: 'oui' })).toEqual({ seuil: 30, auto: false })
+    expect(lireRelais({ seuil: 99 })).toEqual({ seuil: 90, auto: false })
+    expect(lireRelais({ seuil: 63 })).toEqual({ seuil: 65, auto: false })
+    expect([changerSeuil(60, 1), changerSeuil(60, -1), changerSeuil(90, 1), changerSeuil(30, -1)]).toEqual([65, 55, 90, 30])
   })
 })

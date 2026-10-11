@@ -1,12 +1,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Autre, LigneFil, Mesures, Plume, Reglages } from '../types'
-import { AUCUN, basculer, jaugeVisible, lireReglages, type Commande } from './reglages'
-import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
+import type { Autre, LigneFil, Mesures, Plume, ReglageRelais, Reglages } from '../types'
+import { AUCUN, basculer, changerSeuil, jaugeVisible, lireRelais, lireReglages, type Commande } from './reglages'
+import { MESURES_VIDES, lireMesures, pourcentageCache, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP, CONSIGNE_FIL, CONSIGNE_RELAIS, REPRISE_RELAIS, SYSTEME_PLUME, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
+import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
@@ -20,6 +20,8 @@ export const maintenantA = atom({ plugin: 'pupitre', key: 'maintenant' } as cons
 export const plumeA = atom({ plugin: 'pupitre', key: 'plume' } as const, { original: null, jusqua: 0, enCours: false } as Plume)
 export const ouvertA = atom({ plugin: 'pupitre', key: 'reglagesOuverts' } as const, false)
 export const chargeA = atom({ plugin: 'pupitre', key: 'charge' } as const, false)
+export const relaisA = atom({ plugin: 'pupitre', key: 'relais' } as const, lireRelais(undefined) as ReglageRelais)
+export const cacheA = atom({ plugin: 'pupitre', key: 'cache' } as const, null as number | null)
 
 let derniereUsage: UsageLu | null = null
 
@@ -32,6 +34,8 @@ let gardeClear: { lignes: LigneFil[]; autres: Autre[] } = { lignes: [], autres: 
 let relaisDepuis: number | null = null // heure du clic sur « Passer le relais », tant que le relais est en cours
 const SEUIL_SON_MS = 30_000 // carillon seulement après un travail de plus de 30 s
 let tourEnCours = false // turn.start ne dit pas qui démarre : on ne remet à zéro qu'au début d'un tour principal
+let demandeTour = '' // le début de la demande en cours : titre de la ligne de Claude
+let seuilPasse = false // le contexte a dépassé le seuil du relais : on ne prévient qu'une fois par dépassement
 
 async function majLignes($: Dollar): Promise<void> {
   const maintenant = await $.clock.now()
@@ -41,7 +45,7 @@ async function majLignes($: Dollar): Promise<void> {
   for (const id of ordre) {
     const s = suivis.get(id)
     if (!s) continue
-    const qui = id === 'claude' ? 'Claude' : (noms.get(id) ?? 'Sous-agent')
+    const qui = id === 'claude' ? (demandeTour || 'Claude') : (noms.get(id) ?? 'Sous-agent')
     lignes.push(ligneDe(id, qui, s, maintenant, avant.find(l => l.id === id)))
   }
   await update($, lignesA, () => lignes)
@@ -68,7 +72,27 @@ async function lancerRelais($: Dollar): Promise<void> {
   if (relaisDepuis !== null) return
   relaisDepuis = await $.clock.now()
   $.ui.toast('Pupitre : relais en cours…')
-  envoyer($, CONSIGNE_RELAIS)
+  let id = ''
+  try { id = await $.session.id() } catch { /* sans id, relais.md n'aura pas la ligne pour rouvrir la conversation */ }
+  envoyer($, consigneRelais(id))
+}
+
+// Au-delà du seuil choisi : une notification (une fois par dépassement), ou le relais lancé tout seul en automatique.
+async function surveillerRelais($: Dollar): Promise<void> {
+  const ctx = (await read($, mesuresA)).contexte.pct
+  const { seuil, auto } = await read($, relaisA)
+  if (!(await read($, reglagesA)).relais || ctx === null || ctx < seuil) { seuilPasse = false; return }
+  if (seuilPasse) return
+  seuilPasse = true
+  if (auto && !tourEnCours) await lancerRelais($)
+  else $.ui.toast(`Pupitre : contexte à ${Math.round(ctx)} %, pense à passer le relais.`)
+}
+
+async function reglerRelais($: Dollar, f: (r: ReglageRelais) => ReglageRelais): Promise<void> {
+  const r = f(await read($, relaisA))
+  await update($, relaisA, () => r)
+  await $.store.set('relais', r)
+  seuilPasse = false
 }
 
 // Réglages (gardés sur le disque) et mesures : au démarrage, et de nouveau après un /clear.
@@ -79,6 +103,8 @@ async function charger($: Dollar): Promise<void> {
   derniereUsage = { context: u.context, rateLimits: u.rateLimits }
   const maintenant = await $.clock.now()
   await update($, mesuresA, () => lireMesures(derniereUsage!, maintenant))
+  const relais = lireRelais(await $.store.get('relais'))
+  await update($, relaisA, () => relais)
   await update($, chargeA, () => true)
 }
 
@@ -137,7 +163,7 @@ async function nomAgent($: Dollar, agentId: string): Promise<void> {
   numeroAgent += 1
   let description = ''
   try { description = (await $.agent.list()).find(a => a.id === agentId)?.description ?? '' } catch { /* liste indisponible */ }
-  noms.set(agentId, `Sous-agent ${numeroAgent}${description ? ` · ${description}` : ''}`)
+  noms.set(agentId, `${numeroAgent} · ${description || 'Sous-agent'}`)
 }
 
 const DESCRIPTIONS: Record<Commande, string> = {
@@ -146,6 +172,7 @@ const DESCRIPTIONS: Record<Commande, string> = {
   fil: 'Allume ou éteint les barres de progression de Claude et des sous-agents',
   relais: 'Allume ou éteint le bouton « Passer le relais »',
   plume: 'Allume ou éteint le bouton « Améliorer le prompt »',
+  cap: 'Allume ou éteint le cap automatique : Claude te propose 3 suites à la fin de chaque réponse',
 }
 
 async function appliquer($: Dollar, c: Commande): Promise<{ reglages: Reglages; message: string }> {
@@ -178,7 +205,7 @@ export const register: Register = on => {
     await $.command.register({ name: 'fil', description: DESCRIPTIONS.fil })
     await $.command.register({ name: 'relais', description: DESCRIPTIONS.relais })
     await $.command.register({ name: 'plume', description: DESCRIPTIONS.plume })
-    await $.command.register({ name: 'cap', description: 'Claude te pose ses questions pour fixer la suite' })
+    await $.command.register({ name: 'cap', description: DESCRIPTIONS.cap })
     await charger($)
     await update($, lignesA, l => lignesGardees(l)) // suivis repart à vide : seules les barres finies (et leur croix) restent
 
@@ -249,13 +276,23 @@ export const register: Register = on => {
     return { ...r, sections: [...r.sections, { id: 'pupitre-fil', text: CONSIGNE_FIL, scope: 'session' as const }] }
   })
 
+  // Cap automatique : la consigne part avec chacun de tes messages (le contexte d'un message de l'utilisateur arrive à
+  // Claude ; ceux du mod lui-même, non, et une commande part telle quelle).
+  on('prompt.submit', async ($, e, next) => {
+    if (next.origin.plugin === 'pupitre' || e.text.trimStart().startsWith('/') || !(await read($, reglagesA)).cap) return next(e)
+    return next({ ...e, context: [...(e.context ?? []), CONSIGNE_CAP_AUTO] })
+  })
+
   on('turn.start', async ($, e, next) => {
-    if (!tourEnCours && (await read($, reglagesA)).fil) {
+    if (!tourEnCours) {
       tourEnCours = true
-      const maintenant = await $.clock.now()
-      suivis.set('claude', debutTour(suivis.get('claude') ?? nouveauSuivi(maintenant), maintenant))
-      for (const k of [...suivis.keys()]) if (k !== 'claude') suivis.delete(k)
-      await majLignes($)
+      if (e.text.trim()) demandeTour = e.text.trim().split('\n')[0]!
+      if ((await read($, reglagesA)).fil) {
+        const maintenant = await $.clock.now()
+        suivis.set('claude', debutTour(suivis.get('claude') ?? nouveauSuivi(maintenant), maintenant))
+        for (const k of [...suivis.keys()]) if (k !== 'claude') suivis.delete(k)
+        await majLignes($)
+      }
     }
     return next(e)
   })
@@ -284,7 +321,11 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId ?? 'claude'
-    if (!e.agentId) tourEnCours = false
+    if (!e.agentId) {
+      tourEnCours = false
+      const cache = pourcentageCache(e.usage)
+      if (cache !== null) await update($, cacheA, () => cache)
+    }
     if (!e.agentId && e.durationMs > SEUIL_SON_MS && !e.isAborted && (await read($, reglagesA)).fil) {
       void carillon($).catch(() => { /* pas de sortie audio */ })
     }
@@ -295,18 +336,11 @@ export const register: Register = on => {
       for (const [k, s] of suivis) if (s.fin === null) { suivis.set(k, finir(s, maintenant)); change = true }
       if (change) await majLignes($)
     } else {
-      // un sous-agent fini pendant que Claude travaille encore : sa ligne part après 4 s
+      // un sous-agent fini pendant que Claude travaille encore : sa ligne passe au vert et reste jusqu'à la croix
       const s = suivis.get(id)
       if (s && s.fin === null) {
-        const maintenant = await $.clock.now()
-        suivis.set(id, finir(s, maintenant))
+        suivis.set(id, finir(s, await $.clock.now()))
         await majLignes($)
-        $.clock.after(4000, () => {
-          void (async () => {
-            const t = suivis.get(id)
-            if (t && t.fin !== null && tourEnCours) { suivis.delete(id); await majLignes($) }
-          })()
-        })
       }
     }
     if (!e.agentId && relaisDepuis !== null) {
@@ -338,6 +372,7 @@ export const register: Register = on => {
     derniereUsage = { context: e.context, rateLimits: e.rateLimits }
     const maintenant = await $.clock.now()
     await update($, mesuresA, () => lireMesures(derniereUsage!, maintenant))
+    await surveillerRelais($)
     return next(e)
   })
 
@@ -346,7 +381,10 @@ export const register: Register = on => {
     const T = $.ui.resolve(e) as unknown as Elements
     const r = await read($, reglagesA)
     const boutons: Bouton[] = []
-    if (r.relais) boutons.push({ cle: 'relais', libelle: 'Passer le relais', action: () => { void lancerRelais($) } })
+    const mesures = await read($, mesuresA)
+    const relais = await read($, relaisA)
+    const ctx = mesures.contexte.pct
+    if (r.relais) boutons.push({ cle: 'relais', libelle: ctx !== null && ctx >= relais.seuil ? `Passer le relais · ${Math.round(ctx)} %` : 'Passer le relais', action: () => { void lancerRelais($) } })
     const plume = await read($, plumeA)
     if (r.plume) {
       if (plume.original !== null) boutons.push({ cle: 'revenir', libelle: 'Revenir à mon texte', action: () => { void revenir($) } })
@@ -357,7 +395,8 @@ export const register: Register = on => {
     const maintenant = await $.clock.now()
     const arbre = dessinerBande(T, e.surface, e.props.bodyColumns, e.props.maxRows, {
       reglages: r,
-      mesures: await read($, mesuresA),
+      mesures,
+      cache: await read($, cacheA),
       lignes: await read($, lignesA),
       autres: await read($, autresA),
       maintenant,
@@ -368,14 +407,12 @@ export const register: Register = on => {
         ouvert: await read($, ouvertA),
         basculer: c => { void boutonReglage($, c) },
         replier: () => { void update($, ouvertA, () => false) },
+        relais,
+        seuil: sens => { void reglerRelais($, x => ({ ...x, seuil: changerSeuil(x.seuil, sens) })) },
+        auto: () => { void reglerRelais($, x => ({ ...x, auto: !x.auto })) },
       },
     })
     return arbre === null ? next(e) : (arbre as never)
-  })
-
-  on('command.run', { command: 'cap' }, async $ => {
-    envoyer($, CONSIGNE_CAP)
-    return { text: 'Pupitre : je prépare mes questions sur la suite.' }
   })
 
   on('command.run', { command: 'pupitre' }, async $ => bascule($, 'pupitre'))
@@ -383,4 +420,5 @@ export const register: Register = on => {
   on('command.run', { command: 'fil' }, async $ => bascule($, 'fil'))
   on('command.run', { command: 'relais' }, async $ => bascule($, 'relais'))
   on('command.run', { command: 'plume' }, async $ => bascule($, 'plume'))
+  on('command.run', { command: 'cap' }, async $ => bascule($, 'cap'))
 }

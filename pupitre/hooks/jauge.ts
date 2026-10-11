@@ -32,6 +32,12 @@ export function dureeCourte(resetsAt: string | undefined, maintenant: number): s
   return d === 'remise à zéro imminente' ? '↻ imminente' : `↻ ${d.replace('remise à zéro dans ', '')}`
 }
 
+// Part de la dernière demande servie par le cache d'Anthropic (moins chère et plus rapide) ; null sans demande.
+export function pourcentageCache(u: { input_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number } | undefined): number | null {
+  const total = u ? u.input_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens : 0
+  return u && total > 0 ? Math.round(u.cache_read_input_tokens / total * 100) : null
+}
+
 export function formatPct(pct: number | null): string {
   return pct === null ? TIRET : `${Math.round(pct)} %`
 }

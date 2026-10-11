@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { MESURES_VIDES, dureeAvant, dureeCourte, formatPct, kilo, lireMesures } from '../hooks/jauge'
+import { MESURES_VIDES, dureeAvant, dureeCourte, formatPct, kilo, lireMesures, pourcentageCache } from '../hooks/jauge'
 
 const T0 = Date.parse('2026-10-11T10:00:00Z')
 
@@ -51,4 +51,10 @@ describe('jauge', () => {
     expect(m.septJ).toEqual({ pct: 93.4, detail: 'remise à zéro dans 3 j 4 h', court: '↻ 3 j 4 h' })
     expect(m.contexte.court).toBe('')
   })
+})
+
+test('cache : part de la dernière demande lue dans le cache', async () => {
+  expect(pourcentageCache({ input_tokens: 10, cache_read_input_tokens: 82, cache_creation_input_tokens: 8, output_tokens: 5 })).toBe(82)
+  expect(pourcentageCache({ input_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 3 })).toBe(null)
+  expect(pourcentageCache(undefined)).toBe(null)
 })

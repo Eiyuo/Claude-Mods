@@ -7,8 +7,9 @@ export type LigneFil = {
   progression: number; avant: number; niveau: Niveau; niveauAvant: Niveau
   fini: boolean; eclat: boolean; debut: number; majLe: number; finiLe: number | null
 }
+export type ReglageRelais = { seuil: number; auto: boolean } // seuil du contexte, en %, de 30 à 90
 export type Plume = { original: string | null; jusqua: number; enCours: boolean }
-export type Autre = { id: string; titre: string; tache: string; compteur: string; progression: number; niveau: Niveau; debut: number; majLe: number; finiLe: number | null }
+export type Autre = { id: string; titre: string; tache: string; compteur: string; progression: number; niveau: Niveau; debut: number; majLe: number; finiLe: number | null; demande: string; mot: string }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -21,6 +22,8 @@ declare module 'claude-code' {
       plume: Plume
       reglagesOuverts: boolean
       charge: boolean
+      relais: ReglageRelais
+      cache: number | null
     }
   }
 }

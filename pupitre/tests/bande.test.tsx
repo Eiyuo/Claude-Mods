@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import { PAR_CAR_BUREAU, dispositionJauge } from '../hooks/bande'
-import { CONSIGNE_CAP, CONSIGNE_RELAIS } from '../hooks/textes'
+import { CONSIGNE_CAP_AUTO } from '../hooks/textes'
 import { ficheDe } from '../hooks/partage'
 import type { LigneFil } from '../types'
 
@@ -155,7 +155,7 @@ test('travail fini : la barre reste, avec une croix « Fermer », jusqu à ce qu
   await $.turn.complete({ answer: '', durationMs: 5000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
   await horloge.advance(10_000)
   const avant = JSON.stringify(await ui.drawn())
-  expect(avant).toContain('Claude')
+  expect(avant).toContain('fais ceci') // la demande sert de titre
   expect(avant).toContain('Sous-agent')
   const [x, ...autresCroix] = await croix()
   expect(autresCroix).toHaveLength(0)
@@ -165,7 +165,7 @@ test('travail fini : la barre reste, avec une croix « Fermer », jusqu à ce qu
   expect(x!.props.role).toBeUndefined()
   await ui.press({ key: 'fermer-fil' })
   const apres = JSON.stringify(await ui.drawn())
-  expect(apres).not.toContain('Claude')
+  expect(apres).not.toContain('fais ceci')
   expect(apres).not.toContain('Sous-agent')
   expect(apres).toContain('Contexte') // la jauge reste
   await ui.unmount()
@@ -193,13 +193,13 @@ test('autre discussion finie : sa ligne reste, avec sa croix, même une fois l a
   const croix = async () => (await ui.findAll({ type: 'Button' })).filter(b => b.key === 'fermer-autre')
   expect(JSON.stringify(await ui.drawn())).toContain('Atelier')
   expect(await croix()).toHaveLength(0) // pas pendant le travail
-  poser({ ...L, fini: true, finiLe: horloge.now(), tache: 'Terminé', compteur: '✓', progression: 1, niveau: 3 })
+  poser({ ...L, fini: true, finiLe: horloge.now(), tache: 'Terminé', compteur: '✓', mot: '✓ Fini', progression: 1, niveau: 3 })
   await horloge.advance(2_000)
   fiche = '' // l'autre discussion se ferme
   await horloge.advance(60_000)
   const reste = JSON.stringify(await ui.drawn())
   expect(reste).toContain('Atelier')
-  expect(reste).toContain('Terminé')
+  expect(reste).toContain('100 %')
   const [x] = await croix()
   expect(x!.props.label).toBe('×')
   await ui.press({ key: 'fermer-autre' })
@@ -230,27 +230,125 @@ test('chaque image porte l heure de son dessin : redessinée, son animation ne r
 
 // Sur l'application, ce qu'un mod ajoute au prompt système n'arrive pas à Claude (vu à l'essai du relais) :
 // la consigne entière part donc dans le message.
-test('/cap et relais : la demande part toute seule, consigne entière dans le message', async ($, on) => {
+test('relais : la demande part toute seule, consigne entière dans le message', async ($, on) => {
   const envoyes: string[] = []
   on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
   const horloge = await preparer($, on)
-  await $.command.run({ command: 'cap', args: '' })
-  await horloge.advance(10)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   await ui.press({ key: 'relais' })
   await horloge.advance(10)
-  expect(envoyes).toEqual([CONSIGNE_CAP, CONSIGNE_RELAIS])
+  expect(envoyes).toHaveLength(1)
+  expect(envoyes[0]).toContain('Passer le relais')
+  expect(envoyes[0]).toContain('claude --resume')
   await ui.unmount()
 })
 
-test('/cap : si la demande ne part pas, elle attend dans la zone de texte', async ($, on) => {
+test('relais : si la demande ne part pas, elle attend dans la zone de texte', async ($, on) => {
   const remplis: string[] = []
   on('prompt.submit', async () => ({ drop: 'session occupée' }) as never)
   on('prompt.fill', async ($, e) => { remplis.push(e.text); return { isFilled: true } as never })
   const horloge = await preparer($, on)
-  await $.command.run({ command: 'cap', args: '' })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'relais' })
   await horloge.advance(10)
-  expect(remplis).toEqual([CONSIGNE_CAP])
+  expect(remplis).toHaveLength(1)
+  expect(remplis[0]).toContain('Passer le relais')
+  await ui.unmount()
+})
+
+test('cap automatique : la consigne part avec chacun de tes messages tant que /cap est allumé', async ($, on) => {
+  const recus: (readonly string[] | undefined)[] = []
+  on('prompt.submit', async ($, e) => { recus.push(e.context); return { text: e.text } as never })
+  await preparer($, on) // /pupitre allume tout, cap compris
+  await $.prompt.submit({ text: 'fais ceci' })
+  await $.prompt.submit({ text: '/fil' }) // une commande part telle quelle
+  await $.command.run({ command: 'cap', args: '' })
+  await $.prompt.submit({ text: 'fais cela' })
+  expect(recus[0] ?? []).toContain(CONSIGNE_CAP_AUTO)
+  expect(recus[1] ?? []).not.toContain(CONSIGNE_CAP_AUTO)
+  expect(recus[2] ?? []).not.toContain(CONSIGNE_CAP_AUTO)
+})
+
+const svgFil = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
+  (await ui.findAll({ type: 'Svg' })).filter(x => !/^(Contexte|Limite)/.test(String(x.props.alt)))
+
+test('une ligne par travail : la demande en titre, le pourcentage, et toutes les barres de la même largeur', async ($, on) => {
+  await preparer($, on)
+  await $.turn.start({ text: 'Analyse le dossier radar-youtube', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
+  await $.tool.call({ tool: 'Read', input: { file_path: 'a.md' }, agentId: 'a1' } as never)
+  await $.turn.complete({ answer: '', durationMs: 5000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
+    const texte = JSON.stringify(await ui.drawn())
+    expect(texte).toContain('Analyse le dossier radar-youtube')
+    expect(texte).toContain('100 %')
+    expect(texte).not.toContain('Terminé') // le titre reste la demande
+    if (surface === 'desktop') {
+      const largeurs = (await svgFil(ui)).map(x => x.props.width)
+      expect(largeurs).toHaveLength(2) // Claude et son sous-agent ; la croix ne raccourcit pas la première
+      expect(new Set(largeurs).size).toBe(1)
+    }
+    await ui.unmount()
+  }
+})
+
+test('un sous-agent fini reste affiché jusqu à la croix, même pendant que Claude travaille', async ($, on) => {
+  const horloge = await preparer($, on)
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'a.md' }, agentId: 'a1' } as never)
+  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', agentId: 'a1' } as never)
+  await horloge.advance(10_000)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(JSON.stringify(await ui.drawn())).toContain('Sous-agent')
+  await ui.unmount()
+})
+
+test('cache : la part de la dernière demande lue dans le cache, sous la jauge', async ($, on) => {
+  await preparer($, on)
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', usage: { model: 'm', input_tokens: 10, cache_read_input_tokens: 82, cache_creation_input_tokens: 8, output_tokens: 5 } } as never)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(JSON.stringify(await ui.drawn())).toContain('Cache 82 %')
+  await ui.unmount()
+})
+
+const mesurer = (pct: number) => ({ context: { tokens: pct * 10, window: 1000, percent: pct }, rateLimits: [], changed: ['context'] }) as never
+
+test('relais au bon moment : au-delà du seuil, le bouton affiche le contexte et une notification prévient une fois', async ($, on) => {
+  const toasts: string[] = []
+  on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
+  on('session.measure', async ($, e) => ({ changed: e.changed }) as never)
+  await preparer($, on)
+  await $.session.measure(mesurer(55))
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(await libelles(ui)).toContain('Passer le relais')
+  await $.session.measure(mesurer(62))
+  await $.session.measure(mesurer(64))
+  expect(await libelles(ui)).toContain('Passer le relais · 64 %')
+  expect(toasts.filter(t => t.includes('relais'))).toHaveLength(1)
+  await ui.unmount()
+})
+
+test('relais au bon moment : seuil réglable, et relais lancé tout seul en automatique', async ($, on) => {
+  const envoyes: string[] = []
+  on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
+  on('session.measure', async ($, e) => ({ changed: e.changed }) as never)
+  const horloge = await preparer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'reglages' })
+  expect(JSON.stringify(await ui.drawn())).toContain('60 %')
+  await ui.press({ key: 'seuil-plus' })
+  expect(JSON.stringify(await ui.drawn())).toContain('65 %')
+  await ui.press({ key: 'relais-auto' })
+  await $.session.measure(mesurer(62))
+  await horloge.advance(10)
+  expect(envoyes).toHaveLength(0) // sous le seuil de 65 %
+  await $.session.measure(mesurer(66))
+  await horloge.advance(10)
+  expect(envoyes).toHaveLength(1)
+  expect(envoyes[0]).toContain('Passer le relais')
+  await ui.unmount()
 })
 
 test('carillon : sous Windows, c est PowerShell qui joue le son du mod (le moteur n y joue rien)', async ($, on) => {
@@ -275,7 +373,8 @@ test('« Réglages » déplie une ligne avec un bouton par fonction, puis se rep
     expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
     await ui.press({ key: 'reglages' })
     const ouverts = await libelles(ui)
-    for (const l of ['✓ Jauge', '✓ Fil', '✓ Relais', '✓ Plume', 'Tout éteindre', 'Replier']) expect(ouverts).toContain(l)
+    for (const l of ['✓ Jauge', '✓ Fil', '✓ Relais', '✓ Plume', '✓ Cap', 'Tout éteindre', 'Replier', '−', '+', '○ Automatique']) expect(ouverts).toContain(l)
+    expect(JSON.stringify(await ui.drawn())).toContain('Relais à :')
     await ui.press({ key: 'replier' })
     expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
     await ui.unmount()

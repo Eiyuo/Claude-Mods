@@ -1,5 +1,5 @@
-import type { Autre, LigneFil, Mesure, Mesures, Reglages } from '../types'
-import { PALETTES_FIL, PALETTES_JAUGE, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
+import type { Autre, LigneFil, Mesure, Mesures, Niveau, ReglageRelais, Reglages } from '../types'
+import { HAUTEUR_FIL, PALETTES_JAUGE, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
 import { formatPct } from './jauge'
 import { chrono } from './textes'
 import { jaugeVisible, toutAllume, type Commande } from './reglages'
@@ -71,12 +71,15 @@ export function dessinerJauge(T: Elements, surface: string, colonnes: number, me
   )
 }
 
-// La ligne des boutons, sous la jauge, calée à droite.
-export function dessinerBoutons(T: Elements, boutons: readonly Bouton[]) {
-  const { Box, Button } = T
+// La ligne des boutons, sous la jauge, calée à droite ; à gauche, la part du cache quand on la connaît.
+export function dessinerBoutons(T: Elements, boutons: readonly Bouton[], cache: number | null) {
+  const { Box, Button, Text } = T
   return (
-    <Box flexDirection="row" alignItems="center" justifyContent="flex-end" gap={1}>
-      {boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}
+    <Box flexDirection="row" alignItems="center" justifyContent={cache === null ? 'flex-end' : 'space-between'} gap={1}>
+      {cache === null ? null : <Text dimColor wrap="truncate">{`Cache ${cache} %`}</Text>}
+      <Box flexDirection="row" alignItems="center" gap={1}>
+        {boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}
+      </Box>
     </Box>
   )
 }
@@ -85,50 +88,102 @@ export type EtatBande = {
   reglages: Reglages; mesures: Mesures; lignes: readonly LigneFil[]; autres: readonly Autre[]
   maintenant: number // heure du dessin : chronos, et animations des images (voir pixels.ts)
   boutons: readonly Bouton[]
+  cache: number | null // part de la dernière demande lue dans le cache, en %
   fermer?: () => void // croix « Fermer » : retire les barres /fil une fois le travail fini
   fermerAutre?: (id: string) => void // croix d'une autre discussion finie : retire sa ligne
   reglage?: ActionsReglage // ligne « Pupitre : ✓ Jauge ✓ Fil … », dépliée par le bouton « Réglages »
 }
 
-export type ActionsReglage = { ouvert: boolean; basculer: (c: Commande) => void; replier: () => void }
-const FONCTIONS: readonly [Exclude<Commande, 'pupitre'>, string][] = [['jauge', 'Jauge'], ['fil', 'Fil'], ['relais', 'Relais'], ['plume', 'Plume']]
+export type ActionsReglage = {
+  ouvert: boolean; basculer: (c: Commande) => void; replier: () => void
+  relais: ReglageRelais; seuil: (sens: -1 | 1) => void; auto: () => void
+}
+const FONCTIONS: readonly [Exclude<Commande, 'pupitre'>, string][] = [['jauge', 'Jauge'], ['fil', 'Fil'], ['relais', 'Relais'], ['plume', 'Plume'], ['cap', 'Cap']]
 
 export function dessinerReglages(T: Elements, r: Reglages, a: ActionsReglage) {
   const { Box, Text, Button } = T
-  return (
+  const fonctions = (
     <Box flexDirection="row" alignItems="center" gap={1}>
-      <Text dimColor>Pupitre :</Text>
+      <Text dimColor wrap="truncate">Pupitre :</Text>
       {FONCTIONS.map(([c, nom]) => <Button key={`basculer-${c}`} label={`${r[c] ? '✓' : '○'} ${nom}`} onPress={() => a.basculer(c)} />)}
       <Button key="tout" label={toutAllume(r) ? 'Tout éteindre' : 'Tout allumer'} onPress={() => a.basculer('pupitre')} />
       <Button key="replier" label="Replier" onPress={() => a.replier()} />
     </Box>
   )
-}
-
-const COL_QUI = 14, COL_COMPTEUR = 8, COL_CHRONO = 8, COL_FERMER = 10
-
-function ligne(T: Elements, surface: string, colonnes: number, l: LigneFil, maintenant: number, fermer?: () => void) {
-  const { Box, Text, Svg, Button } = T
-  const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4 - (fermer ? COL_FERMER : 0))
-  const fin = l.finiLe ?? maintenant
-  const w = Math.max(40, Math.round(largeur * PX_COL))
-  const barre = surface === 'terminal' || Svg === undefined
-    ? <Text color={TEXTE_NIVEAU[l.niveau]}>{barreTexte(l.progression, largeur - l.mot.length - 1)} {l.mot}</Text>
-    : <Svg key={`b-${l.id}`} source={svgFil({ largeur: w, progression: l.progression, avant: l.avant, niveau: l.niveau, niveauAvant: l.niveauAvant, fini: l.fini, eclat: l.eclat, mot: l.mot, graine: graineDe(l.id), majLe: l.majLe, maintenant })} alt={`${l.qui} : ${l.tache}, ${l.compteur}`} width={w} height={22} />
+  if (!r.relais) return fonctions
   return (
-    <Box key={`l-${l.id}`} flexDirection="row" gap={1} alignItems="flex-end">
-      <Box width={COL_QUI}><Text dimColor wrap="truncate">{l.qui}</Text></Box>
-      <Box flexDirection="column" flexGrow={1}>
-        <Text color={TEXTE_NIVEAU[l.niveau]} bold wrap="truncate">{l.tache}</Text>
-        {barre}
+    <Box flexDirection="column" gap={1}>
+      {fonctions}
+      <Box flexDirection="row" alignItems="center" gap={1}>
+        <Text dimColor wrap="truncate">Relais à :</Text>
+        <Button key="seuil-moins" label="−" onPress={() => a.seuil(-1)} />
+        <Text wrap="truncate">{`${a.relais.seuil} %`}</Text>
+        <Button key="seuil-plus" label="+" onPress={() => a.seuil(1)} />
+        <Button key="relais-auto" label={`${a.relais.auto ? '✓' : '○'} Automatique`} onPress={() => a.auto()} />
       </Box>
-      <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{l.compteur}</Text></Box>
-      <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono(fin - l.debut)}</Text></Box>
-      {/* croix de fermeture : le bureau ne dessine d'un Button que son label (ni son contenu, ni role « dismiss »
-          dans cette bande, vérifié sur capture), donc la croix est le label ; le cadre du bouton garde la zone cliquable. */}
-      {fermer ? <Button key="fermer-fil" label="×" onPress={() => fermer()} /> : null}
     </Box>
   )
+}
+
+// Une ligne par travail, aux mêmes colonnes partout : icône, titre, barre, %, temps, croix. La place de la croix
+// est gardée sur chaque ligne : toutes les barres ont la même longueur, et les textes restent alignés.
+const COL_ICONE = 2, COL_TITRE = 30, COL_PCT = 6, COL_CHRONO = 7, COL_FERMER = 7
+
+export function largeurBarre(colonnes: number): number {
+  return Math.max(10, colonnes - COL_ICONE - COL_TITRE - COL_PCT - COL_CHRONO - COL_FERMER - 5)
+}
+
+type Rang = {
+  cle: string; icone: string; titre: string; secondaire: boolean
+  progression: number; avant: number; niveau: Niveau; niveauAvant: Niveau; fini: boolean; eclat: boolean
+  mot: string; majLe: number; debut: number; finiLe: number | null
+  fermer?: { cle: string; action: () => void }
+}
+
+function rang(T: Elements, surface: string, colonnes: number, r: Rang, maintenant: number) {
+  const { Box, Text, Svg, Button } = T
+  const largeur = largeurBarre(colonnes)
+  const w = Math.max(40, Math.round(largeur * PX_COL))
+  const pct = `${Math.round((r.fini ? 1 : r.progression) * 100)} %`
+  const barre = surface === 'terminal' || Svg === undefined
+    ? <Text color={TEXTE_NIVEAU[r.niveau]} wrap="truncate">{barreTexte(r.fini ? 1 : r.progression, Math.max(1, largeur - r.mot.length - 1))} {r.mot}</Text>
+    : <Svg key={`b-${r.cle}`} source={svgFil({ largeur: w, progression: r.progression, avant: r.avant, niveau: r.niveau, niveauAvant: r.niveauAvant, fini: r.fini, eclat: r.eclat, mot: r.mot, graine: graineDe(r.cle), majLe: r.majLe, maintenant })} alt={`${r.titre} : ${r.mot}, ${pct}`} width={w} height={HAUTEUR_FIL} />
+  return (
+    <Box key={`l-${r.cle}`} flexDirection="row" gap={1} alignItems="center">
+      <Box width={COL_ICONE}><Text color={TEXTE_NIVEAU[r.niveau]} wrap="truncate">{r.icone}</Text></Box>
+      <Box width={COL_TITRE}><Text dimColor={r.secondaire} wrap="truncate">{r.titre}</Text></Box>
+      <Box width={largeur}>{barre}</Box>
+      <Box width={COL_PCT} justifyContent="flex-end"><Text dimColor wrap="truncate">{pct}</Text></Box>
+      <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor wrap="truncate">{chrono((r.finiLe ?? maintenant) - r.debut)}</Text></Box>
+      {/* croix de fermeture : le bureau ne dessine d'un Button que son label (ni son contenu, ni role « dismiss »
+          dans cette bande, vérifié sur capture), donc la croix est le label ; le cadre du bouton garde la zone cliquable. */}
+      <Box width={COL_FERMER} justifyContent="flex-end">{r.fermer ? <Button key={r.fermer.cle} label="×" onPress={() => r.fermer!.action()} /> : null}</Box>
+    </Box>
+  )
+}
+
+function depuisLigne(l: LigneFil, fermer?: () => void): Rang {
+  return {
+    cle: l.id, icone: l.id !== 'claude' ? '↳' : l.fini ? '✓' : '●', titre: l.qui, secondaire: l.id !== 'claude',
+    progression: l.progression, avant: l.avant, niveau: l.niveau, niveauAvant: l.niveauAvant, fini: l.fini, eclat: l.eclat,
+    mot: l.mot, majLe: l.majLe, debut: l.debut, finiLe: l.finiLe,
+    fermer: fermer ? { cle: 'fermer-fil', action: fermer } : undefined,
+  }
+}
+
+function tronquer(t: string, n: number): string {
+  return t.length <= n ? t : `${t.slice(0, Math.max(1, n - 1))}…`
+}
+
+function depuisAutre(a: Autre, fermer?: (id: string) => void): Rang {
+  const fini = a.finiLe !== null
+  return {
+    cle: a.id, icone: fini ? '✓' : '●', secondaire: false,
+    titre: `${tronquer(a.demande || a.tache || 'Discussion', Math.max(8, COL_TITRE - a.titre.length - 3))} · ${a.titre}`,
+    progression: a.progression, avant: a.progression, niveau: a.niveau, niveauAvant: a.niveau, fini, eclat: false,
+    mot: a.mot || (fini ? '✓ Fini' : 'En cours'), majLe: a.majLe, debut: a.debut, finiLe: a.finiLe,
+    fermer: fini && fermer ? { cle: `fermer-${a.id}`, action: () => fermer(a.id) } : undefined,
+  }
 }
 
 export function dessinerBande(T: Elements, surface: string, colonnes: number, maxRows: number, s: EtatBande) {
@@ -139,42 +194,14 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   if (!jauge && lignes.length === 0 && autres.length === 0) return null
   // croix « Fermer » sur la première ligne /fil, une fois que tout est fini
   const fermer = s.fermer && lignes.length > 0 && lignes.every(l => l.fini) ? s.fermer : undefined
-  // de haut en bas : autres discussions, /fil, la jauge, les boutons, puis les réglages dépliés sous « Réglages »
+  // de haut en bas : cette discussion (Claude, puis ses sous-agents), les autres, la jauge, les boutons, les réglages
   const rangs = [
-    autres.length > 0 ? dessinerAutres(T, surface, colonnes, autres, s.maintenant, s.fermerAutre) : null,
-    ...lignes.map((l, i) => ligne(T, surface, colonnes, l, s.maintenant, i === 0 ? fermer : undefined)),
+    ...lignes.map((l, i) => rang(T, surface, colonnes, depuisLigne(l, i === 0 ? fermer : undefined), s.maintenant)),
+    ...autres.map(a => rang(T, surface, colonnes, depuisAutre(a, s.fermerAutre), s.maintenant)),
     s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.maintenant) : null,
-    jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons) : null,
+    jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons, s.reglages.jauge ? s.cache : null) : null,
     jauge && s.reglage?.ouvert ? dessinerReglages(T, s.reglages, s.reglage) : null,
   ].filter(r => r !== null)
   if (rangs.length === 1) return rangs[0]
   return <Box flexDirection="column" gap={1}>{rangs}</Box>
-}
-
-export function dessinerAutres(T: Elements, surface: string, colonnes: number, autres: readonly Autre[], maintenant: number, fermer?: (id: string) => void) {
-  const { Box, Text, Svg, Button } = T
-  return (
-    <Box flexDirection="column">
-      <Text dimColor>Autres discussions</Text>
-      {autres.map(a => {
-        const croix = fermer && a.finiLe !== null
-        const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4 - (croix ? COL_FERMER : 0))
-        const w = Math.max(20, Math.round(largeur * PX_COL))
-        return (
-          <Box key={`a-${a.id}`} flexDirection="row" gap={1} alignItems="flex-end">
-            <Box width={COL_QUI}><Text wrap="truncate">{a.titre}</Text></Box>
-            <Box flexDirection="column" flexGrow={1}>
-              <Text dimColor wrap="truncate">{a.tache}</Text>
-              {surface === 'terminal' || Svg === undefined
-                ? <Text dimColor>{barreTexte(a.progression, largeur)}</Text>
-                : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: a.progression, palette: PALETTES_FIL[a.niveau]!, graine: graineDe(a.id), maintenant })} alt={`${a.titre} : ${a.tache}`} width={w} height={10} />}
-            </Box>
-            <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{a.compteur}</Text></Box>
-            <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono((a.finiLe ?? maintenant) - a.debut)}</Text></Box>
-            {croix ? <Button key={`fermer-${a.id}`} label="×" onPress={() => fermer(a.id)} /> : null}
-          </Box>
-        )
-      })}
-    </Box>
-  )
 }

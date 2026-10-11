@@ -19,11 +19,11 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 | `/fil` | Allume ou éteint les barres de progression de Claude et de ses sous-agents |
 | `/relais` | Allume ou éteint le bouton « Passer le relais » |
 | `/plume` | Allume ou éteint le bouton « Améliorer le prompt » |
-| `/cap` | Claude te pose tout de suite ses questions sur la suite |
+| `/cap` | Allume ou éteint le cap automatique : à la fin de chaque réponse, Claude te demande « Et maintenant, on fait quoi ? » avec 3 suites |
 
 À chaque changement, un petit message confirme ce qui est allumé ou éteint, par exemple « Pupitre : fil éteint ». Les réglages sont gardés d'une session à l'autre.
 
-**Sans taper de commande : le bouton « Réglages ».** Il est au bout de la ligne des boutons. Un clic déplie juste en dessous la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · Tout éteindre · Replier ». Chaque bouton allume (✓) ou éteint (○) sa fonction ; « Tout éteindre » devient « Tout allumer » dès qu'une fonction est éteinte ; « Replier » range la ligne. Si tu éteins tout, la bande disparaît : tape `/pupitre` pour la rallumer.
+**Sans taper de commande : le bouton « Réglages ».** Il est au bout de la ligne des boutons. Un clic déplie juste en dessous la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · ✓ Cap · Tout éteindre · Replier », et, quand le relais est allumé, la ligne « Relais à : − 60 % + · ○ Automatique ». Chaque bouton allume (✓) ou éteint (○) sa fonction ; « Tout éteindre » devient « Tout allumer » dès qu'une fonction est éteinte ; « Replier » range la ligne. Si tu éteins tout, la bande disparaît : tape `/pupitre` pour la rallumer.
 
 ### La jauge (`/jauge`)
 
@@ -45,17 +45,19 @@ Le symbole **↻** donne le temps avant la remise à zéro. Chaque texte tient s
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 
-Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ».
+Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ». À gauche, « Cache 82 % » : la part de ta dernière demande déjà gardée en mémoire chez Anthropic, donc moins chère et plus rapide.
 
 ### Le fil (`/fil`)
 
-**La ligne de Claude.** Une barre de progression dans le style du curseur d'effort « Ultracode » : des pixels colorés qui scintillent, un reflet qui la traverse, et un curseur qui avance.
+**Une ligne par travail.** Toutes les lignes ont les mêmes colonnes, pour que tout reste aligné :
 
-- **Au-dessus de la barre** : la tâche en cours, par exemple « Tâche 3 · Écrire le module /fil ».
-- **Dans le curseur** : l'étape, en un mot (Lecture, Recherche, Écriture, Commande, Délégation, Web, Question, Réflexion…).
-- **À droite** : le nombre de tâches finies (« 3 / 7 ») et le temps écoulé.
+- un point (« ✓ » quand c'est fini) ;
+- le début de ta demande, par exemple « Analyse le dossier radar… » ;
+- la barre : des pixels colorés qui scintillent, un reflet qui la traverse, et une étiquette au bout, avec l'étape en un mot (Lecture, Recherche, Écriture, Commande, Délégation, Web, Question, Réflexion…) ;
+- le pourcentage et le temps écoulé ;
+- la croix **×**, une fois le travail fini. Sa place est gardée sur chaque ligne : toutes les barres ont la même longueur.
 
-**Comment la barre avance.** Quand /fil est allumé, Claude découpe tout travail de plus de 2 étapes en une liste de tâches, et la barre avance à chaque tâche finie. Pour une réponse courte sans liste, la barre avance par estimation (elle ralentit vers 90 %, le compteur affiche « ≈ »), puis passe à 100 % à la fin.
+**Comment la barre avance.** Si Claude tient une liste de tâches, la barre avance à chaque tâche finie. Sinon (c'est le cas aujourd'hui : Claude Code ne lui donne pas d'outil de liste de tâches), elle avance par estimation : elle ralentit vers 90 %, puis passe à 100 % à la fin.
 
 **Les couleurs suivent l'avancement :**
 
@@ -68,11 +70,11 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 
 **Où.** Les barres du fil s'affichent au-dessus de la jauge.
 
-**Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa propre ligne, avec la même barre. S'il finit pendant que Claude travaille encore, sa ligne disparaît 4 secondes après.
+**Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa ligne juste sous celle de Claude (« ↳ 1 · sa description »), avec la même barre. Quand il finit, sa ligne passe au vert et reste affichée jusqu'à la croix.
 
 **À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. La croix **×** au bout de la ligne de Claude les retire. Sinon, elles sont remplacées à ta demande suivante.
 
-**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît en haut de la bande sur une ligne fine, sous « Autres discussions ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre. Quand elle a fini, sa ligne passe au vert et reste affichée ; la croix **×** au bout de la ligne la retire.
+**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît dans la même liste, avec le nom de son dossier : « Ajoute du beurre… · essai-relais ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre. Quand elle a fini, sa ligne passe au vert et reste affichée ; la croix **×** au bout de la ligne la retire.
 
 **Le son.** Un carillon doux de deux notes sonne quand Claude a fini, si la réponse a pris plus de 30 secondes. Pas de son pour les réponses rapides.
 
@@ -80,32 +82,34 @@ Si Windows demande moins d'animations, le scintillement, le reflet et la gerbe s
 
 ### Fixer le cap (`/cap`)
 
-Tape `/cap` quand tu ne sais pas trop quelle est la suite, ou pour éviter de demander « c'est quoi la suite ? ».
+Tape `/cap` pour allumer (ou éteindre) le cap automatique. Une fois allumé, à la fin de chaque réponse, quand le travail demandé est fini, Claude te demande dans la fenêtre à choix : « Et maintenant, on fait quoi ? », avec 3 suites possibles, sa recommandation en premier. Tu choisis, ou tu tapes autre chose, et il repart.
 
-1. Claude relit la conversation.
-2. Il te pose de 1 à 4 questions dans la fenêtre à choix : prochaine étape, priorité, ce qu'on laisse de côté…
-3. Tu choisis, et il repart sur ce cap.
+Pour ça, une courte consigne part avec chacun de tes messages (tu ne la vois pas). Elle ne part pas avec une commande comme `/fil`.
 
 ### Passer le relais (`/relais`)
 
 Quand la conversation devient longue (jauge « Contexte » qui se remplit), clique sur **« Passer le relais »** :
 
 1. Claude écrit le fichier **`relais.md`** à la racine du projet ouvert, avec :
-   - où on en est ;
+   - une ligne pour rouvrir l'ancienne conversation (`claude --resume …`) ;
+   - un statut : « À REPRENDRE », ou « ATTENDRE » si la suite dépend d'une décision de ta part ;
+   - l'objectif ;
+   - les contraintes permanentes ;
    - ce qui a été fait ;
-   - ce qui reste à faire ;
-   - les décisions prises ;
-   - les contraintes et règles à respecter ;
+   - l'état actuel ;
+   - les décisions prises, et pourquoi ;
+   - les prochaines étapes ;
    - les blocages ;
-   - les fichiers clés ;
-   - la prochaine action.
+   - les fichiers clés.
 2. Il l'enregistre dans git (commit), sans l'envoyer sur GitHub. Pour l'envoyer, demande-le, comme d'habitude.
-3. La conversation est vidée, et la zone de texte est préremplie avec : « Lis relais.md à la racine du projet et reprends là où on s'est arrêtés. »
+3. La conversation est vidée, et la zone de texte est préremplie avec la phrase de reprise : Claude résume en 3 lignes où on en est, puis reprend aux prochaines étapes sans refaire ce qui est fait (ou attend ta décision si le statut est « ATTENDRE »).
 4. Tu n'as plus qu'à appuyer sur Entrée : la nouvelle conversation repart avec tout l'essentiel, et une mémoire neuve.
 
 Comme `relais.md` est dans git, tu peux passer le relais au bureau, faire `git pull` chez toi et reprendre exactement au même endroit.
 
 Si `relais.md` n'a pas pu être écrit, la conversation n'est pas vidée et un message te prévient.
+
+**Au bon moment.** Dans « Réglages », choisis ton seuil (60 % par défaut, de 30 à 90 %). Quand le contexte le dépasse, le bouton affiche le contexte (« Passer le relais · 62 % ») et une notification te prévient une fois. En « Automatique », le relais se lance tout seul à la fin de la réponse qui dépasse le seuil.
 
 ### Améliorer le prompt (`/plume`)
 

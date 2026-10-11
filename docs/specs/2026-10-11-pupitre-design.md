@@ -248,6 +248,17 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 4. **Remplacement** (`$.prompt.fill`, mode `replace`). Le texte d'origine est gardé 30 s derrière le bouton « Revenir à mon texte ».
 5. **Erreur.** Si l'appel échoue, le brouillon reste intact et le message « Amélioration impossible : réessaie » s'affiche.
 
+## 10 bis. Évolutions du 11/10 (après la vidéo d'inspiration)
+
+Elles remplacent ce qui, plus haut, les contredit.
+
+- **Une ligne par travail (9.1 à 9.3).** Mêmes colonnes partout : icône (● en cours, ✓ fini, ↳ sous-agent), titre (le début de la demande ; pour une autre discussion, « demande · dossier »), barre de 18 px avec l'étape dans une étiquette, pourcentage, temps, croix. La place de la croix est gardée sur chaque ligne : toutes les barres ont la même longueur. Les autres discussions sont dans la même liste, sous celles de cette discussion ; leur fiche porte aussi la demande et le mot d'étape.
+- **Sous-agents.** Un sous-agent fini reste affiché, vert, jusqu'à la croix (plus de départ au bout de 4 s).
+- **Cache.** À la fin de chaque réponse, `turn.complete` donne `usage` : « Cache 82 % » (lu dans le cache / entrée totale) s'affiche à gauche de la ligne des boutons quand la jauge est allumée.
+- **/cap automatique.** `/cap` bascule `cap`, comme les autres commandes. Allumé, un `prompt.submit` joint `CONSIGNE_CAP_AUTO` au `context` de chaque message de l'utilisateur (sauf une commande « / ») : à la fin du travail, Claude pose « Et maintenant, on fait quoi ? » avec AskUserQuestion et 3 suites. Vérifié dans le terminal : le contexte d'un message de l'utilisateur arrive à Claude, alors que le prompt système d'un mod (`prompt.compose`, `prompt.context`) n'est pas consulté.
+- **Relais au bon moment.** Réglage `{ seuil, auto }` gardé dans `$.store` (clé `relais`), seuil de 30 à 90 % par pas de 5, 60 % par défaut. À chaque `session.measure`, au-delà du seuil : le bouton devient « Passer le relais · 62 % » et une notification prévient une fois par dépassement ; en automatique, le relais se lance s'il n'y a pas de tour en cours.
+- **relais.md.** Première ligne `<!-- Conversation d'origine : claude --resume <id> -->`, puis `STATUT : À REPRENDRE` ou `ATTENDRE`, puis Objectif, Contraintes permanentes, Ce qui a été fait, État actuel, Décisions, Prochaines étapes, Blocages, Fichiers clés. La phrase de reprise repart des prochaines étapes, ou attend si le statut est ATTENDRE.
+
 ## 11. Cas particuliers et limites
 
 - **Terminal.** Sans élément `Svg`, la bande est dessinée en caractères : blocs `█▓▒░` dans les mêmes couleurs, et le mot d'étape après la barre. Pas d'animation.

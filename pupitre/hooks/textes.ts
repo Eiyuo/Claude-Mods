@@ -12,22 +12,27 @@ export function chrono(ms: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
-export const CONSIGNE_CAP =
-  "L'utilisateur a tapé /cap : il veut fixer le cap. Relis la conversation, puis pose-lui de 1 à 4 questions avec l'outil " +
-  "AskUserQuestion : prochaine étape, priorité, ce qu'on laisse de côté, et toute autre décision encore ouverte. Chaque " +
-  "question a des options concrètes ; place ta recommandation en premier, avec « (Recommandé) » à la fin de son libellé. " +
-  "Ensuite, reprends le travail sur le cap choisi, sans redemander."
+// Jointe à chacun de tes messages tant que le cap automatique est allumé (le contexte d'un message de l'utilisateur
+// arrive à Claude, le prompt système d'un mod non).
+export const CONSIGNE_CAP_AUTO =
+  "Mode cap du mod pupitre : quand tu as fini le travail demandé, et seulement à ce moment-là, termine ta réponse par " +
+  "l'outil AskUserQuestion avec la question « Et maintenant, on fait quoi ? » et 3 suites possibles, concrètes et utiles " +
+  "pour la suite du travail ; place ta recommandation en premier, avec « (Recommandé) » à la fin de son libellé. Ne la " +
+  "pose pas si tu poses déjà une autre question ou si le travail n'est pas fini."
 
-export const CONSIGNE_RELAIS =
-  "Passer le relais. Écris le fichier relais.md à la racine du projet ouvert (remplace-le s'il existe), en français, " +
-  "avec ces parties : la date ; où on en est ; ce qui a été fait ; ce qui reste à faire ; les décisions prises et pourquoi ; " +
-  "les contraintes et règles à respecter ; les blocages et problèmes ; les fichiers clés ; la prochaine action précise. " +
-  "Écris-le pour qu'une conversation neuve, qui n'a rien vu, puisse reprendre exactement là. N'y mets ni identifiant " +
-  "d'entreprise ni nom réel de l'utilisateur. Puis, si le dossier est un dépôt git, enregistre-le : git add relais.md, " +
-  "puis git commit -m \"docs: relais\" ; n'envoie rien sur le dépôt distant. Si ce n'est pas un dépôt git, dis-le. " +
-  "Réponds ensuite en une seule ligne."
+export function consigneRelais(sessionId: string): string {
+  return "Passer le relais. Écris le fichier relais.md à la racine du projet ouvert (remplace-le s'il existe), en français. " +
+    `Première ligne : <!-- Conversation d'origine : claude --resume ${sessionId} -->. Deuxième ligne : « STATUT : À REPRENDRE », ` +
+    "ou « STATUT : ATTENDRE » si la suite dépend d'une décision de l'utilisateur. Puis la date, et ces parties : Objectif ; " +
+    "Contraintes permanentes (les règles à toujours respecter) ; Ce qui a été fait ; État actuel ; Décisions prises et " +
+    "pourquoi ; Prochaines étapes (la première, précise) ; Blocages ; Fichiers clés. Écris-le pour qu'une conversation " +
+    "neuve, qui n'a rien vu, puisse reprendre exactement là. N'y mets ni identifiant d'entreprise ni nom réel de " +
+    "l'utilisateur. Puis, si le dossier est un dépôt git, enregistre-le : git add relais.md, puis git commit -m \"docs: relais\" ; " +
+    "n'envoie rien sur le dépôt distant. Si ce n'est pas un dépôt git, dis-le. Réponds ensuite en une seule ligne."
+}
 export const REPRISE_RELAIS =
-  "Lis relais.md à la racine du projet et reprends là où on s'est arrêtés. Commence par me résumer en 3 lignes où on en est."
+  "Lis relais.md à la racine du projet et résume-moi en 3 lignes où on en est. Si son STATUT est ATTENDRE, arrête-toi là " +
+  "et attends ma décision ; sinon, reprends à « Prochaines étapes », sans refaire ce qui est déjà fait."
 
 export function relaisEcrit(mtimeMs: number | null, debut: number): boolean {
   return mtimeMs !== null && mtimeMs >= debut

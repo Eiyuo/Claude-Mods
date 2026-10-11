@@ -123,11 +123,12 @@ export type OptionsFil = {
 
 const retard = (ms: number) => `animation-delay:calc(var(--u) + ${ms}ms)`
 const RANGS = (n: number) => Array.from({ length: n }, (_, i) => i)
+export const HAUTEUR_FIL = 18 // une ligne de texte : la barre tient sur la ligne de son titre
 
 function dessinerFil(o: OptionsFil, c: number): string {
   const W = Math.max(40, Math.round(o.largeur))
-  const H = 22
-  const rows = 7
+  const H = HAUTEUR_FIL
+  const rows = 6
   const pal = PALETTES_FIL[o.niveau]!
   const palAvant = PALETTES_FIL[o.niveauAvant]!
   const fin = o.fini ? W : Math.round(Math.max(0, Math.min(1, o.progression)) * W)
@@ -159,7 +160,7 @@ function dessinerFil(o: OptionsFil, c: number): string {
     for (let n = 0; n < 16; n++) {
       const a = bruit(n * 13 + 7, o.graine) * Math.PI * 2
       const s = 6 + bruit(n * 17 + 3, o.graine) * 10
-      gerbe += `<rect class="g" x="${W - 10}" y="9" width="3" height="3" fill="${pal[n % 4]}" style="--dx:${(Math.cos(a) * s).toFixed(1)}px;--dy:${(Math.sin(a) * s * 0.7).toFixed(1)}px;${retard(n * 12)}"/>`
+      gerbe += `<rect class="g" x="${W - 10}" y="7" width="3" height="3" fill="${pal[n % 4]}" style="--dx:${(Math.cos(a) * s).toFixed(1)}px;--dy:${(Math.sin(a) * s * 0.7).toFixed(1)}px;${retard(n * 12)}"/>`
     }
   }
   const css = CSS_COMMUN(o.maintenant, o.majLe) + `
@@ -170,7 +171,7 @@ ${RANGS(6).map(i => `.a${i},.b${i}{${retard(i * 44)}}`).join('')}
 ${RANGS(6).map(i => `.d${i}{${retard(i * 130)}}`).join('')}${RANGS(10).map(i => `.f${i}{${retard(i * 61)}}`).join('')}
 @keyframes fond{from{opacity:1}to{opacity:0}}
 .k{transform:translateX(${kx}px);${glisse}}@keyframes glisse{from{transform:translateX(${kxAvant}px)}to{transform:translateX(${kx}px)}}
-.pop{transform-origin:${cw / 2}px 7px;animation:pop .5s cubic-bezier(.34,1.56,.64,1);${retard(0)}}@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+.pop{transform-origin:${cw / 2}px 9px;animation:pop .5s cubic-bezier(.34,1.56,.64,1);${retard(0)}}@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
 .g{animation:gerbe .7s ease-out both}@keyframes gerbe{from{transform:none;opacity:1}to{transform:translate(var(--dx),var(--dy));opacity:0}}`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     `<style>${css}</style>` +
@@ -178,8 +179,8 @@ ${RANGS(6).map(i => `.d${i}{${retard(i * 130)}}`).join('')}${RANGS(10).map(i => 
     `<rect width="${W}" height="${H}" rx="7" fill="rgba(128,128,128,.12)" stroke="rgba(128,128,128,.35)" stroke-width=".5"/>` +
     `<g clip-path="url(#p)">${fond.svg()}${sur.svg()}${etincelles}<g clip-path="url(#q)">${o.fini ? '' : reflet(fin, H, c)}</g></g>` +
     gerbe +
-    `<g class="k"><g${o.eclat ? ' class="pop"' : ''}><rect y="4" width="${cw}" height="14" rx="4" fill="${pal[3]}" stroke="rgba(255,255,255,.4)" stroke-width=".5"/>` +
-    `<text x="6" y="11.5" dominant-baseline="middle" fill="#FFFFFF" font-size="11" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${echapper(o.mot)}</text></g></g>` +
+    `<g class="k"><g${o.eclat ? ' class="pop"' : ''}><rect y="2" width="${cw}" height="14" rx="4" fill="${pal[3]}" stroke="rgba(255,255,255,.4)" stroke-width=".5"/>` +
+    `<text x="6" y="9.5" dominant-baseline="middle" fill="#FFFFFF" font-size="11" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${echapper(o.mot)}</text></g></g>` +
     `</svg>`
 }
 

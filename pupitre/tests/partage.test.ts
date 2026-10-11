@@ -51,6 +51,12 @@ describe('partage', () => {
     const enCours = suivreAutres([], [ficheDe('a', 'A', L, 10_000)], 'moi', 10_000)
     expect(suivreAutres(enCours, [], 'moi', 30_000)).toEqual([])
   })
+  test('la fiche porte la demande (titre de la ligne) et le mot d étape ; une ancienne fiche se relit sans', async () => {
+    const f = ficheDe('s1', 'X', { ...L, qui: 'Analyse le dossier', mot: 'Lecture' }, 1000)
+    expect([f.demande, f.mot]).toEqual(['Analyse le dossier', 'Lecture'])
+    const { demande: _d, mot: _m, ...ancienne } = f
+    expect(lireFiche(JSON.stringify(ancienne))).toMatchObject({ demande: '', mot: '' })
+  })
   test('nom de fichier sûr et titre', async () => {
     expect(nomFichier('abc/../d:e')).toBe('abc____d_e.json')
     expect(titreDe('C:\\Users\\x\\Desktop\\Coding\\Mon Projet')).toBe('Mon Projet')

@@ -5,6 +5,7 @@ export const PERIME_MS = 15_000
 export type Fiche = {
   id: string; titre: string; tache: string; compteur: string; progression: number
   niveau: Niveau; debut: number; majLe: number; actif: boolean; finiLe: number | null
+  demande: string; mot: string // titre de la ligne (le début de la demande) et mot d'étape
 }
 
 export function ficheDe(id: string, titre: string, l: LigneFil | undefined, maintenant: number): Fiche {
@@ -12,7 +13,7 @@ export function ficheDe(id: string, titre: string, l: LigneFil | undefined, main
     id, titre,
     tache: l?.tache ?? '', compteur: l?.compteur ?? '', progression: l?.progression ?? 0,
     niveau: l?.niveau ?? 0, debut: l?.debut ?? maintenant, majLe: maintenant,
-    actif: l !== undefined && !l.fini, finiLe: l?.finiLe ?? null,
+    actif: l !== undefined && !l.fini, finiLe: l?.finiLe ?? null, demande: l?.qui ?? '', mot: l?.mot ?? '',
   }
 }
 
@@ -28,7 +29,8 @@ export function lireFiche(texte: string): Fiche | null {
   return {
     id: o.id as string, titre: o.titre as string, tache: o.tache as string, compteur: o.compteur as string,
     progression: o.progression as number, niveau, debut: o.debut as number, majLe: o.majLe as number, actif: o.actif as boolean,
-    finiLe: n('finiLe') ? o.finiLe as number : null, // absente des fiches d'une version précédente
+    finiLe: n('finiLe') ? o.finiLe as number : null, // ces trois-là manquent aux fiches d'une version précédente
+    demande: s('demande') ? o.demande as string : '', mot: s('mot') ? o.mot as string : '',
   }
 }
 
@@ -39,7 +41,7 @@ export function suivreAutres(avant: readonly Autre[], fiches: readonly (Fiche | 
   const fraiches = fiches.filter((f): f is Fiche => f !== null && f.id !== moi && maintenant - f.majLe <= PERIME_MS && (f.actif || (f.finiLe !== null && vues.has(f.id))))
   const ids = new Set(fraiches.map(f => f.id))
   return [
-    ...fraiches.map(f => ({ id: f.id, titre: f.titre, tache: f.tache, compteur: f.compteur, progression: f.progression, niveau: f.niveau, debut: f.debut, majLe: f.majLe, finiLe: f.finiLe })),
+    ...fraiches.map(f => ({ id: f.id, titre: f.titre, tache: f.tache, compteur: f.compteur, progression: f.progression, niveau: f.niveau, debut: f.debut, majLe: f.majLe, finiLe: f.finiLe, demande: f.demande, mot: f.mot })),
     ...avant.filter(a => a.finiLe !== null && !ids.has(a.id)),
   ].sort((a, b) => a.debut - b.debut)
 }
