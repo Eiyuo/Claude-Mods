@@ -6,7 +6,7 @@ import { AUCUN, basculer, lireReglages, type Commande } from './reglages'
 import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_FIL } from './textes'
+import { CONSIGNE_CAP, CONSIGNE_FIL, DEMANDE_CAP } from './textes'
 import { PERIME_MS, autresActives, ficheDe, lireFiche, nomFichier, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
@@ -23,6 +23,7 @@ let derniereUsage: UsageLu | null = null
 const suivis = new Map<string, Suivi>()        // 'claude' ou l'agentId
 const noms = new Map<string, string>()         // agentId -> « Sous-agent n · description »
 let numeroAgent = 0
+let consigneSuivante: string[] | null = null // consigne invisible jointe à la prochaine demande envoyée par le mod
 const SEUIL_SON_MS = 30_000 // carillon seulement après un travail de plus de 30 s
 let tourEnCours = false // turn.start ne dit pas qui démarre : on ne remet à zéro qu'au début d'un tour principal
 
@@ -73,6 +74,7 @@ export const register: Register = on => {
     await $.command.register({ name: 'fil', description: DESCRIPTIONS.fil })
     await $.command.register({ name: 'relais', description: DESCRIPTIONS.relais })
     await $.command.register({ name: 'plume', description: DESCRIPTIONS.plume })
+    await $.command.register({ name: 'cap', description: 'Claude te pose ses questions pour fixer la suite' })
     const garde = lireReglages(await $.store.get('reglages'))
     await update($, reglagesA, () => garde)
 
@@ -217,6 +219,21 @@ export const register: Register = on => {
       majJauge: 0,
     })
     return arbre === null ? next(e) : (arbre as never)
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    if (consigneSuivante) {
+      const c = consigneSuivante
+      consigneSuivante = null
+      return next({ ...e, context: [...(e.context ?? []), ...c] })
+    }
+    return next(e)
+  }).catch(($, e, next) => next(e)) // ne jamais bloquer une demande
+
+  on('command.run', { command: 'cap' }, async $ => {
+    consigneSuivante = [CONSIGNE_CAP]
+    void $.prompt.submit({ text: DEMANDE_CAP })
+    return { text: 'Pupitre : je prépare mes questions sur la suite.' }
   })
 
   on('command.run', { command: 'pupitre' }, async $ => bascule($, 'pupitre'))

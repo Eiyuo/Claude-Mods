@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONSIGNE_FIL, chrono } from '../hooks/textes'
+import { CONSIGNE_CAP, CONSIGNE_FIL, DEMANDE_CAP, chrono } from '../hooks/textes'
 
 describe('textes', () => {
   test('la consigne /fil demande une liste de tâches à Claude et aux sous-agents', async () => {
@@ -12,4 +12,11 @@ describe('textes', () => {
     expect(chrono(3_725_000)).toBe('1:02:05')
     expect(chrono(-5)).toBe('0:00')
   })
+})
+
+test('/cap : consigne et demande', async () => {
+  expect(CONSIGNE_CAP).toContain('AskUserQuestion')
+  expect(CONSIGNE_CAP).toContain('1 à 4')
+  expect(CONSIGNE_CAP).toContain('(Recommandé)')
+  expect(DEMANDE_CAP.length).toBeGreaterThan(0)
 })
