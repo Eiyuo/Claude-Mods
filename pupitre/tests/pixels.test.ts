@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 import { PALETTES_FIL, barreTexte, couleurJauge, echapper, graineDe, niveauDe, svgFil, svgSimple } from '../hooks/pixels'
 
-const BASE = { largeur: 600, progression: 0.5, avant: 0.5, niveau: 1 as const, niveauAvant: 1 as const, fini: false, eclat: false, mot: 'Lecture', graine: 3, majLe: 1000 }
+const BASE = { largeur: 600, progression: 0.5, avant: 0.5, niveau: 1 as const, niveauAvant: 1 as const, fini: false, eclat: false, mot: 'Lecture', graine: 3, majLe: 1000, maintenant: 1000 }
 
 describe('niveaux et couleurs', () => {
   test('1/3 et 2/3 exacts donnent le niveau supérieur, une seule fois', async () => {
@@ -55,12 +55,21 @@ describe('svgFil', () => {
   test('respecte la demande de moins d animations', async () => {
     expect(svgFil(BASE)).toContain('prefers-reduced-motion')
   })
+  test('redessinée, l image reprend ses animations où elles en étaient, sans revenir en arrière', async () => {
+    for (const o of [{ ...BASE, avant: 0.2 }, { ...BASE, progression: 1, avant: 0.6, niveau: 3 as const, niveauAvant: 2 as const, fini: true, eclat: true }]) {
+      const s = svgFil({ ...o, majLe: 10_000, maintenant: 11_000 })
+      expect(s).toContain('--t:-11.00s') // boucles (reflet, respiration, étincelles) : calées sur l'heure du dessin
+      expect(s).toContain('--u:-1.00s') // effets d'un changement (cases neuves, curseur, éclat) : calés sur l'heure du changement
+      expect(s).not.toMatch(/animation-delay:\s*-?[\d.]+m?s/) // aucun délai figé, qui repartirait de zéro à chaque dessin
+    }
+  })
 })
 
 describe('svgSimple et texte', () => {
   test('jauge pleine et sous la limite', async () => {
-    const s = svgSimple({ largeur: 400, hauteur: 10, cellule: 2, rayon: 4, progression: 0.93, palette: ['#E66E6E', '#DE5A5A', '#D64545', '#C43737'], graine: 1, majLe: 0 })
+    const s = svgSimple({ largeur: 400, hauteur: 10, cellule: 2, rayon: 4, progression: 0.93, palette: ['#E66E6E', '#DE5A5A', '#D64545', '#C43737'], graine: 1, maintenant: 11_000 })
     expect(s).toContain('#D64545')
+    expect(s).toContain('--t:-11.00s')
     expect(s.length).toBeLessThan(125000)
   })
   test('barre en caractères pour le terminal', async () => {
@@ -76,7 +85,7 @@ describe('svgSimple et texte', () => {
 })
 
 test('svgSimple : info-bulle échappée quand un titre est donné', async () => {
-  const o = { largeur: 120, hauteur: 10, cellule: 2, rayon: 4, progression: 0.4, palette: PALETTES_FIL[0]!, graine: 1, majLe: 0 }
+  const o = { largeur: 120, hauteur: 10, cellule: 2, rayon: 4, progression: 0.4, palette: PALETTES_FIL[0]!, graine: 1, maintenant: 0 }
   expect(svgSimple(o)).not.toContain('<title>')
   expect(svgSimple({ ...o, titre: 'Limite 5 h : <remise> & co' })).toContain('<title>Limite 5 h : &lt;remise&gt; &amp; co</title>')
 })

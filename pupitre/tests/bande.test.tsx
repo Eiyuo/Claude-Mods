@@ -178,6 +178,29 @@ test('aucune barre en cadre interactif : un cadre se recharge à chaque changeme
   await ui.unmount()
 })
 
+test('chaque image porte l heure de son dessin : redessinée, son animation ne revient pas en arrière', async ($, on) => {
+  const horloge = await preparer($, on)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
+  await horloge.advance(2_500)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const svgs = await ui.findAll({ type: 'Svg' })
+  expect(svgs.length).toBe(4)
+  for (const s of svgs) expect(String(s.props.source)).toContain('--t:-1002.50s')
+  await ui.unmount()
+})
+
+test('carillon : sous Windows, c est PowerShell qui joue le son du mod (le moteur n y joue rien)', async ($, on) => {
+  mock.env(on, { OS: 'Windows_NT', USERPROFILE: 'C:/Users/essai' })
+  const lances: string[] = []
+  on('process.run', async ($, e) => { lances.push(e.argv.join(' ')); return { value: { exitCode: 0, stdout: '', stderr: '' } } as never })
+  await preparer($, on)
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  await $.turn.complete({ answer: '', durationMs: 31_000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  expect(lances).toHaveLength(1)
+  expect(lances[0]).toContain('powershell')
+  expect(lances[0]).toContain('assets/carillon.wav')
+})
+
 const libelles = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
   (await ui.findAll({ type: 'Button' })).map(b => String(b.props.label))
 

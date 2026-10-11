@@ -83,6 +83,13 @@ async function ameliorer($: Dollar): Promise<void> {
   }
 }
 
+// Le moteur ne joue un son que sur macOS (afplay) ; sous Windows, il ne joue rien : PowerShell lit alors le fichier du mod.
+async function carillon($: Dollar): Promise<void> {
+  if ((await $.env.get('OS')) !== 'Windows_NT') return $.audio.play({ asset: 'assets/carillon.wav' })
+  const wav = `${$.plugin.root}/assets/carillon.wav`.replace(/'/g, "''")
+  await $.process.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', `(New-Object Media.SoundPlayer '${wav}').PlaySync()`])
+}
+
 async function fermerFil($: Dollar): Promise<void> {
   if ([...suivis.values()].some(s => s.fin === null)) return // seulement une fois le travail fini
   suivis.clear()
@@ -249,7 +256,7 @@ export const register: Register = on => {
     const id = e.agentId ?? 'claude'
     if (!e.agentId) tourEnCours = false
     if (!e.agentId && e.durationMs > SEUIL_SON_MS && !e.isAborted && (await read($, reglagesA)).fil) {
-      void $.audio.play({ asset: 'assets/carillon.wav' }).catch(() => { /* pas de sortie audio */ })
+      void carillon($).catch(() => { /* pas de sortie audio */ })
     }
     if (!e.agentId) {
       // fin de la réponse : tout passe au vert et reste affiché jusqu'à « Fermer » ou la prochaine demande
@@ -316,14 +323,15 @@ export const register: Register = on => {
       else boutons.push({ cle: 'plume', libelle: plume.enCours ? 'Amélioration…' : 'Améliorer le prompt', action: () => { void ameliorer($) } })
     }
     boutons.push({ cle: 'reglages', libelle: 'Réglages', action: () => { void update($, ouvertA, o => !o) } })
+    await read($, maintenantA) // abonne la bande au tic d'une seconde ; les images, elles, veulent l'heure exacte du dessin
+    const maintenant = await $.clock.now()
     const arbre = dessinerBande(T, e.surface, e.props.bodyColumns, e.props.maxRows, {
       reglages: r,
       mesures: await read($, mesuresA),
       lignes: await read($, lignesA),
       autres: await read($, autresA),
-      maintenant: await read($, maintenantA),
+      maintenant,
       boutons,
-      majJauge: 0,
       fermer: () => { void fermerFil($) },
       reglage: {
         ouvert: await read($, ouvertA),

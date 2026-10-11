@@ -86,7 +86,10 @@ function teinte(palette: readonly string[], t: number, fini: boolean, i: number,
   return c
 }
 
-const CSS_COMMUN = (t: number) => `svg{--t:${(-t / 1000).toFixed(2)}s}
+// Le bureau peut recharger l'image à chaque dessin et ses animations repartent alors de zéro : on les cale sur
+// l'horloge pour qu'elles reprennent où elles en étaient. --t (heure du dessin) pour les boucles, --u (temps écoulé
+// depuis le changement) pour les effets qui ne jouent qu'une fois.
+const CSS_COMMUN = (maintenant: number, majLe: number) => `svg{--t:${(-maintenant / 1000).toFixed(2)}s;--u:${((majLe - maintenant) / 1000).toFixed(2)}s}
 .s0,.s1,.s2,.s3,.s4,.s5,.s6,.s7{animation:respire ease-in-out infinite}
 .s0{animation-duration:1.2s;animation-delay:calc(var(--t) - .1s)}.s1{animation-duration:1.4s;animation-delay:calc(var(--t) - .7s)}
 .s2{animation-duration:1.6s;animation-delay:calc(var(--t) - .3s)}.s3{animation-duration:1.8s;animation-delay:calc(var(--t) - 1.1s)}
@@ -115,8 +118,11 @@ function reflet(fin: number, h: number, c: number): string {
 
 export type OptionsFil = {
   largeur: number; progression: number; avant: number; niveau: Niveau; niveauAvant: Niveau
-  fini: boolean; eclat: boolean; mot: string; graine: number; majLe: number
+  fini: boolean; eclat: boolean; mot: string; graine: number; majLe: number; maintenant: number
 }
+
+const retard = (ms: number) => `animation-delay:calc(var(--u) + ${ms}ms)`
+const RANGS = (n: number) => Array.from({ length: n }, (_, i) => i)
 
 function dessinerFil(o: OptionsFil, c: number): string {
   const W = Math.max(40, Math.round(o.largeur))
@@ -142,30 +148,29 @@ function dessinerFil(o: OptionsFil, c: number): string {
     if (nouvelle) sur.case('#FFFFFF', `b${Math.floor(rr * 6)}`, x, j * c, w, c)
     if (o.eclat) sur.case(teinte(palAvant, t, false, i, j, rows), `f${Math.min(9, Math.floor((x / W * 450 + rr * 160) / 61))}`, x, j * c, w, c)
     else if (o.niveauAvant !== o.niveau && x < finAvant) sur.case(teinte(palAvant, t, false, i, j, rows), `d${Math.floor(rr * 6)}`, x, j * c, w, c)
-    if (bruit(k * 7 + 3, o.graine) < 0.018) etincelles += `<rect class="e" x="${x}" y="${j * c}" width="${w}" height="${c}" fill="#FFFFFF" style="animation-delay:${(-b * 1.6).toFixed(2)}s"/>`
+    if (bruit(k * 7 + 3, o.graine) < 0.018) etincelles += `<rect class="e" x="${x}" y="${j * c}" width="${w}" height="${c}" fill="#FFFFFF" style="animation-delay:calc(var(--t) - ${(b * 1.6).toFixed(2)}s)"/>`
   }
   const cw = Math.round(Array.from(o.mot).length * 6.2) + 12
   const kx = Math.max(3, Math.min(W - cw - 3, fin - cw - 3))
   const kxAvant = Math.max(3, Math.min(W - cw - 3, finAvant - cw - 3))
-  const glisse = kxAvant !== kx ? `animation:glisse .5s cubic-bezier(.34,1.56,.64,1) both;` : ''
+  const glisse = kxAvant !== kx ? `animation:glisse .5s cubic-bezier(.34,1.56,.64,1) both;${retard(0)};` : ''
   let gerbe = ''
   if (o.eclat) {
     for (let n = 0; n < 16; n++) {
       const a = bruit(n * 13 + 7, o.graine) * Math.PI * 2
       const s = 6 + bruit(n * 17 + 3, o.graine) * 10
-      gerbe += `<rect class="g" x="${W - 10}" y="9" width="3" height="3" fill="${pal[n % 4]}" style="--dx:${(Math.cos(a) * s).toFixed(1)}px;--dy:${(Math.sin(a) * s * 0.7).toFixed(1)}px;animation-delay:${n * 12}ms"/>`
+      gerbe += `<rect class="g" x="${W - 10}" y="9" width="3" height="3" fill="${pal[n % 4]}" style="--dx:${(Math.cos(a) * s).toFixed(1)}px;--dy:${(Math.sin(a) * s * 0.7).toFixed(1)}px;${retard(n * 12)}"/>`
     }
   }
-  const css = CSS_COMMUN(o.majLe) + `
+  const css = CSS_COMMUN(o.maintenant, o.majLe) + `
 .a0,.a1,.a2,.a3,.a4,.a5{animation:apparait .26s ease-out both}.b0,.b1,.b2,.b3,.b4,.b5{animation:flash .26s ease-out both}
-.a0,.b0{animation-delay:0ms}.a1,.b1{animation-delay:44ms}.a2,.b2{animation-delay:88ms}.a3,.b3{animation-delay:132ms}.a4,.b4{animation-delay:176ms}.a5,.b5{animation-delay:220ms}
+${RANGS(6).map(i => `.a${i},.b${i}{${retard(i * 44)}}`).join('')}
 @keyframes apparait{from{opacity:0}to{opacity:1}}@keyframes flash{from{opacity:.55}to{opacity:0}}
 .d0,.d1,.d2,.d3,.d4,.d5,.f0,.f1,.f2,.f3,.f4,.f5,.f6,.f7,.f8,.f9{animation:fond .3s ease both}
-.d1{animation-delay:130ms}.d2{animation-delay:260ms}.d3{animation-delay:390ms}.d4{animation-delay:520ms}.d5{animation-delay:650ms}
-.f1{animation-delay:61ms}.f2{animation-delay:122ms}.f3{animation-delay:183ms}.f4{animation-delay:244ms}.f5{animation-delay:305ms}.f6{animation-delay:366ms}.f7{animation-delay:427ms}.f8{animation-delay:488ms}.f9{animation-delay:549ms}
+${RANGS(6).map(i => `.d${i}{${retard(i * 130)}}`).join('')}${RANGS(10).map(i => `.f${i}{${retard(i * 61)}}`).join('')}
 @keyframes fond{from{opacity:1}to{opacity:0}}
 .k{transform:translateX(${kx}px);${glisse}}@keyframes glisse{from{transform:translateX(${kxAvant}px)}to{transform:translateX(${kx}px)}}
-.pop{transform-origin:${cw / 2}px 7px;animation:pop .5s cubic-bezier(.34,1.56,.64,1)}@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+.pop{transform-origin:${cw / 2}px 7px;animation:pop .5s cubic-bezier(.34,1.56,.64,1);${retard(0)}}@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
 .g{animation:gerbe .7s ease-out both}@keyframes gerbe{from{transform:none;opacity:1}to{transform:translate(var(--dx),var(--dy));opacity:0}}`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     `<style>${css}</style>` +
@@ -191,7 +196,7 @@ export function svgFil(o: OptionsFil): string {
 
 export type OptionsSimple = {
   largeur: number; hauteur: number; cellule: number; rayon: number
-  progression: number; palette: readonly string[]; graine: number; majLe: number
+  progression: number; palette: readonly string[]; graine: number; maintenant: number
   titre?: string // info-bulle au survol (l'élément Svg interactif affiche les <title>)
 }
 
@@ -207,7 +212,7 @@ function dessinerSimple(o: OptionsSimple, c: number): string {
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     (o.titre ? `<title>${echapper(o.titre)}</title>` : '') +
-    `<style>${CSS_COMMUN(o.majLe)}</style>` +
+    `<style>${CSS_COMMUN(o.maintenant, o.maintenant)}</style>` +
     `<defs><clipPath id="p"><rect width="${W}" height="${H}" rx="${o.rayon}"/></clipPath><clipPath id="q"><rect width="${fin}" height="${H}"/></clipPath></defs>` +
     `<rect width="${W}" height="${H}" rx="${o.rayon}" fill="rgba(128,128,128,.12)" stroke="rgba(128,128,128,.35)" stroke-width=".5"/>` +
     `<g clip-path="url(#p)">${fond.svg()}<g clip-path="url(#q)">${reflet(fin, H, c)}</g></g></svg>`
