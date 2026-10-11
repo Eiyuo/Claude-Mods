@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Conception validée, réalisation en cours |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.0) |
 
 ---
 
@@ -37,9 +37,10 @@ Les couleurs :
 
 | Couleur | Signification |
 |---|---|
-| Violet | Moins de 75 % |
-| Orange | De 75 à 90 % |
-| Rouge | 90 % et plus |
+| Vert | Moins de 50 % : large |
+| Jaune | De 50 à 75 % : à surveiller |
+| Orange | De 75 à 90 % : ça presse |
+| Rouge | 90 % et plus : critique, la barre bat comme un cœur |
 
 Le symbole **↻** donne le temps avant la remise à zéro. Chaque texte tient sur une seule ligne. Si la fenêtre est trop étroite, la jauge se resserre dans cet ordre : les barres raccourcissent, puis les « ↻ » quittent la ligne, puis les noms deviennent « 5 h » et « 7 jours ».
 
@@ -148,20 +149,36 @@ Seule exception : l'amélioration de /plume, qui passe par Claude comme le reste
 
 ## Installation
 
-À faire **une fois sur chaque PC**. Le dépôt est privé : git te demandera de te connecter à GitHub la première fois.
+À faire **une fois sur chaque ordinateur**, dans un terminal (PowerShell), avec la commande `claude` installée :
 
-1. Ouvre un terminal (PowerShell) et lance `claude`.
-2. À l'invite de Claude, tape :
-   ```
-   /plugin install pupitre --marketplace Eiyuo/Claude-Mods
-   ```
-3. À la question « Add marketplace? », réponds `y`.
-4. Choisis la portée **user** (proposée en premier), puis Entrée.
-5. Ouvre une nouvelle session dans l'application : tape `/pupitre`.
+```
+claude plugin marketplace add Eiyuo/Claude-Mods
+```
 
-Cette commande ne marche pas dans l'onglet Code de l'application : il faut passer par Claude dans un terminal. Le mod installé marche ensuite partout, application comprise.
+```
+claude plugin install pupitre@claude-mods
+```
 
-**Mise à jour.** La marche exacte sera confirmée et écrite ici lors du premier essai.
+Ouvre ensuite une nouvelle conversation (dans l'application ou dans le terminal) et tape `/pupitre` une fois : le réglage est gardé sur l'ordinateur. Le mod se charge ensuite tout seul à chaque lancement de Claude.
+
+**Mise à jour.** Les mises à jour ne sont pas automatiques. Quand une nouvelle version sort :
+
+```
+claude plugin marketplace update claude-mods
+```
+
+```
+claude plugin update pupitre@claude-mods
+```
+
+Puis redémarre Claude (ferme et rouvre l'application).
+
+**Bon à savoir.**
+- Il faut une version récente de Claude Code, et faire confiance au dossier ouvert (Claude le demande la première fois).
+- Les barres animées ne s'affichent que dans l'application ; le terminal les dessine en caractères.
+- Le carillon de fin ne sonne que sous Windows et macOS.
+- « Les autres discussions » ne montre que celles ouvertes sur le même ordinateur.
+- Le mod tourne avec tes droits, comme Claude lui-même : installe-le seulement depuis une source de confiance.
 
 ## Pour Claude (développement)
 

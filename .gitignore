@@ -1,3 +1,6 @@
 .superpowers/
 # Relais du mod pupitre : propre à cet ordinateur, jamais publié
 relais.md
+# Réglages locaux (ils contiennent des chemins de l'ordinateur)
+.claude/settings.local.json
+.impeccable/

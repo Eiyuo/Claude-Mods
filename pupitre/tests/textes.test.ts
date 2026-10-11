@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, chrono, contexteRecent, nettoyerReponse, promptPlume, relaisEcrit } from '../hooks/textes'
+import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, chrono, contexteRecent, messageHumain, nettoyerReponse, promptPlume, relaisEcrit } from '../hooks/textes'
 
 describe('textes', () => {
   test('la consigne /fil demande une liste de tâches à Claude et aux sous-agents', async () => {
@@ -29,6 +29,12 @@ test('/relais : consigne complète et vérifiée, sans identité ni chemin perso
   expect(c).not.toContain('git commit')
   expect(c).toContain("n'envoie rien")
   for (const mot of ['relais.md', 'STATUT', 'ATTENDRE', 'question', 'Prochaines étapes', 'git status', 'Pistes écartées']) expect(REPRISE_RELAIS).toContain(mot)
+})
+test('/cap : la consigne part avec tes messages, pas avec les messages automatiques (tâches de fond, /loop, autres sessions)', async () => {
+  for (const k of ['composer', 'bridge', 'sdk', 'unclassified', 'plugin', 'slack-ping', 'auto-continuation']) expect(messageHumain(k)).toBe(true)
+  for (const k of ['task-notification', 'scheduled-trigger', 'peer', 'peer-send-message', 'projects-relay', 'coordinator', 'observer', 'observer-activity', 'channel']) {
+    expect(messageHumain(k)).toBe(false)
+  }
 })
 test('/relais : la conversation n est vidée que si relais.md a été écrit pendant le relais', async () => {
   expect(relaisEcrit(null, 1000)).toBe(false)

@@ -6,7 +6,7 @@ import { AUCUN, basculer, changerSeuil, jaugeVisible, lireRelais, lireReglages, 
 import { MESURES_VIDES, lireMesures, pourcentageCache, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
+import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, messageHumain, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 
 type Dollar = EngineInterface // le `$` de chaque hook
@@ -32,6 +32,11 @@ let numeroAgent = 0
 // réglages et mesures, et les barres gardées à la fin de l'ancienne conversation.
 let gardeClear: { lignes: LigneFil[]; autres: Autre[] } = { lignes: [], autres: [] }
 let relaisDepuis: number | null = null // heure du clic sur « Passer le relais », tant que le relais est en cours
+// La demande d'un mod ne part qu'au repos : cliquée en plein tour, elle tourne au tour d'après. On suit donc le tour qui
+// porte la consigne, et lui seul décide de la suite.
+let tourRelais: string | null = null
+const RELAIS_MAX_MS = 10 * 60_000 // sans tour de relais au bout de 10 min, la consigne s'est perdue : un clic relance
+let plumeEnCours = false // posé avant tout await : un double clic ne lance qu'une amélioration
 const SEUIL_SON_MS = 30_000 // carillon seulement après un travail de plus de 30 s
 let tourEnCours = false // turn.start ne dit pas qui démarre : on ne remet à zéro qu'au début d'un tour principal
 let demandeTour = '' // le début de la demande en cours : titre de la ligne de Claude
@@ -69,8 +74,10 @@ function envoyer($: Dollar, texte: string): void {
 }
 
 async function lancerRelais($: Dollar): Promise<void> {
-  if (relaisDepuis !== null) return
-  relaisDepuis = await $.clock.now()
+  const maintenant = await $.clock.now()
+  if (relaisDepuis !== null && maintenant - relaisDepuis < RELAIS_MAX_MS) return
+  relaisDepuis = maintenant
+  tourRelais = null
   $.ui.toast('Pupitre : relais en cours…')
   let id = ''
   try { id = await $.session.id() } catch { /* sans id, relais.md n'aura pas la ligne pour rouvrir la conversation */ }
@@ -83,8 +90,9 @@ async function surveillerRelais($: Dollar): Promise<void> {
   const { seuil, auto } = await read($, relaisA)
   if (!(await read($, reglagesA)).relais || ctx === null || ctx < seuil) { seuilPasse = false; return }
   if (seuilPasse) return
+  if (auto && tourEnCours) return // en automatique, on attend la fin du tour : turn.complete relance la surveillance
   seuilPasse = true
-  if (auto && !tourEnCours) await lancerRelais($)
+  if (auto) await lancerRelais($)
   else $.ui.toast(`Pupitre : contexte à ${Math.round(ctx)} %, pense à passer le relais.`)
 }
 
@@ -105,6 +113,7 @@ async function charger($: Dollar): Promise<void> {
   await update($, mesuresA, () => lireMesures(derniereUsage!, maintenant))
   const relais = lireRelais(await $.store.get('relais'))
   await update($, relaisA, () => relais)
+  await update($, plumeA, p => ({ ...p, enCours: false })) // un rechargement en pleine amélioration ne bloque pas le bouton
   await update($, chargeA, () => true)
 }
 
@@ -117,25 +126,30 @@ async function capacites($: Dollar): Promise<Capacite[]> {
 }
 
 async function ameliorer($: Dollar): Promise<void> {
-  const etat = await read($, plumeA)
-  if (etat.enCours) return
-  const { text: brouillon } = await $.prompt.read()
-  if (!brouillon.trim()) { $.ui.toast("Écris d'abord ta demande."); return }
-  await update($, plumeA, p => ({ ...p, enCours: true }))
+  if (plumeEnCours) return
+  plumeEnCours = true
   try {
+    const { text: brouillon } = await $.prompt.read()
+    if (!brouillon.trim()) { $.ui.toast("Écris d'abord ta demande."); return }
+    await update($, plumeA, p => ({ ...p, enCours: true }))
     let dossier = ''
     try { dossier = (await $.session.root()).split(/[\\/]/).pop() ?? '' } catch { /* dossier inconnu */ }
     let contexte = contexteRecent([], dossier)
     try { contexte = contexteRecent(await $.session.messages(), dossier) } catch { /* conversation illisible : la demande seule */ }
-    const demande = { system: SYSTEME_PLUME, prompt: promptPlume(brouillon, await capacites($), contexte), maxTokens: 2000, timeoutMs: 60_000 }
-    let r = await $.model.complete({ ...demande, model: 'sonnet' })
-    if (!r.isAnswered && r.reason === 'api-error') r = await $.model.complete({ ...demande, model: await $.session.model() })
-    const texte = r.isAnswered ? nettoyerReponse(r.text) : ''
+    // une longue demande garde la place de sa réécriture
+    const demande = { system: SYSTEME_PLUME, prompt: promptPlume(brouillon, await capacites($), contexte), maxTokens: Math.min(8000, 2000 + Math.ceil(brouillon.length / 2)), timeoutMs: 60_000 }
+    // un modèle refusé (liste des modèles autorisés) rejette l'appel : on passe alors au modèle de la session
+    const essayer = async (modele: string | Promise<string>) => { try { return await $.model.complete({ ...demande, model: await modele }) } catch { return null } }
+    let r = await essayer('sonnet')
+    if (!r?.isAnswered) r = await essayer($.session.model())
+    const texte = r?.isAnswered ? nettoyerReponse(r.text) : ''
     if (!texte) { $.ui.toast('Amélioration impossible : réessaie.'); return }
+    if ((await $.prompt.read()).text !== brouillon) { $.ui.toast("Ta demande a changé pendant l'amélioration : rien n'est remplacé."); return }
     const fait = await $.prompt.fill({ text: texte, mode: 'replace' })
     if (!fait.isFilled) { $.ui.toast("La zone de texte n'est pas disponible."); return }
     await update($, plumeA, p => ({ ...p, original: brouillon })) // « Revenir à mon texte » jusqu'à l'envoi
   } finally {
+    plumeEnCours = false
     await update($, plumeA, p => ({ ...p, enCours: false }))
   }
 }
@@ -163,8 +177,7 @@ async function effacerFinies($: Dollar): Promise<void> {
 async function revenir($: Dollar): Promise<void> {
   const p = await read($, plumeA)
   if (p.original === null) return
-  await $.prompt.fill({ text: p.original, mode: 'replace' })
-  await update($, plumeA, x => ({ ...x, original: null }))
+  if ((await $.prompt.fill({ text: p.original, mode: 'replace' })).isFilled) await update($, plumeA, x => ({ ...x, original: null }))
 }
 
 async function nomAgent($: Dollar, agentId: string): Promise<void> {
@@ -289,14 +302,16 @@ export const register: Register = on => {
   // Cap automatique : la consigne part avec chacun de tes messages (le contexte d'un message de l'utilisateur arrive à
   // Claude ; ceux du mod lui-même, non, et une commande part telle quelle).
   on('prompt.submit', async ($, e, next) => {
-    if ((await read($, plumeA)).original !== null) await update($, plumeA, p => ({ ...p, original: null })) // envoyé : plus de retour
-    if (next.origin.plugin === 'pupitre' || e.text.trimStart().startsWith('/') || !(await read($, reglagesA)).cap) return next(e)
+    const humain = messageHumain(e.origin?.kind ?? '') // sans origine (kit de test), c'est un message de la personne
+    if (humain && (await read($, plumeA)).original !== null) await update($, plumeA, p => ({ ...p, original: null })) // envoyé : plus de retour
+    if (!humain || next.origin.plugin === 'pupitre' || e.text.trimStart().startsWith('/') || !(await read($, reglagesA)).cap) return next(e)
     return next({ ...e, context: [...(e.context ?? []), CONSIGNE_CAP_AUTO] })
   })
 
   on('turn.start', async ($, e, next) => {
     if (!tourEnCours) {
       tourEnCours = true
+      if (relaisDepuis !== null && e.text.includes(DEBUT_RELAIS)) tourRelais = e.turnId
       // la demande d'un mod commence par « The <mod> plugin sent a message: » : le titre est la ligne d'après
       const lignes = e.text.split('\n').map(l => l.trim()).filter(Boolean)
       const titre = /plugin sent a message:$/.test(lignes[0] ?? '') ? lignes[1] : lignes[0]
@@ -357,19 +372,21 @@ export const register: Register = on => {
         await majLignes($)
       }
     }
-    if (!e.agentId && relaisDepuis !== null) {
+    if (!e.agentId && relaisDepuis !== null && e.turnId === tourRelais) {
       const debut = relaisDepuis
       relaisDepuis = null
+      tourRelais = null
       let mtime: number | null = null
-      try { mtime = (await $.fs.stat(`${await $.session.cwd()}/relais.md`)).mtimeMs } catch { mtime = null }
+      // à la racine du projet, comme le demande la consigne : le dossier courant suit les « cd » de Claude
+      try { mtime = (await $.fs.stat(`${await $.session.root()}/relais.md`)).mtimeMs } catch { mtime = null }
       if (relaisEcrit(mtime, debut)) {
         // vider la conversation une fois le tour vraiment fini, hors de ce hook
         $.clock.after(300, () => {
           void (async () => {
             try {
               await $.command.run({ command: 'clear' })
-              await $.prompt.fill({ text: REPRISE_RELAIS, mode: 'replace' })
-              $.ui.toast('Pupitre : relais passé. Appuie sur Entrée pour reprendre.')
+              const { isFilled } = await $.prompt.fill({ text: REPRISE_RELAIS, mode: 'replace' })
+              $.ui.toast(isFilled ? 'Pupitre : relais passé. Appuie sur Entrée pour reprendre.' : 'Pupitre : relais passé. Pour reprendre, demande : « Lis relais.md et reprends ».')
             } catch {
               $.ui.toast('Pupitre : relais.md est écrit, mais la conversation n a pas pu être vidée. Tape /clear.')
             }
@@ -378,7 +395,10 @@ export const register: Register = on => {
         return next(e)
       }
       $.ui.toast("Le relais n'a pas été écrit : la conversation est conservée.")
+      return next(e)
     }
+    // relais automatique : un dépassement vu en plein tour se traite ici, une fois le travail fini
+    if (!e.agentId && !e.isAborted && relaisDepuis === null) await surveillerRelais($)
     return next(e)
   })
 

@@ -20,9 +20,18 @@ export const CONSIGNE_CAP_AUTO =
   "pour la suite du travail ; place ta recommandation en premier, avec « (Recommandé) » à la fin de son libellé. Ne la " +
   "pose pas si tu poses déjà une autre question ou si le travail n'est pas fini."
 
+// Les messages qui ne viennent pas de toi (tâche de fond, /loop ou tâche planifiée, autre session…) : le cap n'y est pas
+// joint, sinon une boucle sans surveillance finirait bloquée sur une question. L'application arrive en « sdk » ou
+// « unclassified » : on écarte donc les origines automatiques plutôt que de ne garder que le clavier.
+const ORIGINES_AUTO = new Set(['task-notification', 'scheduled-trigger', 'peer', 'peer-send-message', 'projects-relay', 'coordinator', 'observer', 'observer-activity', 'channel'])
+export const messageHumain = (origine: string): boolean => !ORIGINES_AUTO.has(origine)
+
+// Début de la consigne du relais : c'est à lui que le mod reconnaît le tour qui écrit relais.md.
+export const DEBUT_RELAIS = 'Passer le relais. Écris le fichier relais.md'
+
 // relais.md reste sur l'ordinateur : publié avec le dépôt, il exposerait la conversation et les règles de l'utilisateur.
 export function consigneRelais(sessionId: string): string {
-  return "Passer le relais. Écris le fichier relais.md à la racine du projet ouvert (remplace-le s'il existe), en français, " +
+  return `${DEBUT_RELAIS} à la racine du projet ouvert (remplace-le s'il existe), en français, ` +
     "en 80 lignes au plus, sans récit. " +
     `Première ligne : <!-- Conversation d'origine : claude --resume ${sessionId} -->. Deuxième ligne : « STATUT : À REPRENDRE », ` +
     "ou « STATUT : ATTENDRE » si la suite dépend d'une décision de l'utilisateur. Puis la date, et ces parties : Objectif ; " +

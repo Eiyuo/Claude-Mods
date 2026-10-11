@@ -396,6 +396,88 @@ test('relais au bon moment : seuil réglable, et relais lancé tout seul en auto
   await ui.unmount()
 })
 
+test('relais demandé pendant un tour : traité à la fin de son propre tour, relais.md cherché à la racine du projet', async ($, on) => {
+  const envoyes: string[] = []
+  const toasts: string[] = []
+  const commandes: string[] = []
+  let boite = ''
+  let relaisLe: number | null = null
+  on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
+  on('prompt.fill', async ($, e) => { boite = e.text; return { isFilled: true } as never })
+  on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
+  on('command.run', { command: 'clear' }, async () => { commandes.push('clear'); return { text: '' } as never })
+  on('session.root', async () => ({ value: 'C:/projet' }) as never)
+  on('session.cwd', async () => ({ value: 'C:/projet/pupitre' }) as never) // Claude a fait « cd pupitre » pour les tests
+  on('fs.stat', async ($, e) => {
+    // le moteur rend le chemin à la façon Windows
+    if (e.path.replace(/\\/g, '/') === 'C:/projet/relais.md' && relaisLe !== null) return { value: { kind: 'file', size: 10, mtimeMs: relaisLe, isLink: false } } as never
+    throw new Error('absent')
+  })
+  const horloge = await preparer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await $.turn.start({ text: 'un long travail', turnId: 't1' } as never)
+  await ui.press({ key: 'relais' })
+  await horloge.advance(10)
+  const consigne = envoyes.find(t => t.includes('Passer le relais'))!
+  expect(consigne).toBeDefined()
+  await $.turn.complete({ answer: '', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  expect(toasts.some(t => t.includes("n'a pas été écrit"))).toBe(false) // le tour fini n'était pas celui du relais
+  await $.turn.start({ text: `The pupitre plugin sent a message:\n${consigne}`, turnId: 't2' } as never)
+  relaisLe = 2_000_000_000_000
+  await $.turn.complete({ answer: '', durationMs: 1000, isAborted: false, turnId: 't2', reason: 'answer' } as never)
+  await horloge.advance(400)
+  expect(commandes).toEqual(['clear'])
+  expect(boite).toContain('Lis relais.md')
+  await ui.unmount()
+})
+
+test('relais automatique : un dépassement mesuré en plein tour lance le relais à la fin du tour', async ($, on) => {
+  const envoyes: string[] = []
+  on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
+  on('session.measure', async ($, e) => ({ changed: e.changed }) as never)
+  const horloge = await preparer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'reglages' })
+  await ui.press({ key: 'relais-auto' })
+  await $.turn.start({ text: 'un long travail', turnId: 't1' } as never)
+  await $.session.measure(mesurer(66))
+  await horloge.advance(10)
+  expect(envoyes).toHaveLength(0) // pas au milieu du travail
+  await $.turn.complete({ answer: '', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  await horloge.advance(10)
+  expect(envoyes.filter(t => t.includes('Passer le relais'))).toHaveLength(1)
+  await ui.unmount()
+})
+
+test('« Améliorer le prompt » : si tu as continué à écrire pendant l amélioration, ton texte n est pas remplacé', async ($, on) => {
+  let boite = 'refais-les'
+  const toasts: string[] = []
+  on('prompt.read', async () => ({ value: { text: boite, cursor: boite.length } }) as never)
+  on('prompt.fill', async ($, e) => { boite = e.text; return { isFilled: true } as never })
+  on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
+  on('model.complete', async () => { boite = 'refais-les plus jolies, et vite'; return { value: { isAnswered: true, text: 'Réécrit.', usage: {} } } as never })
+  await preparer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'plume' })
+  expect(boite).toBe('refais-les plus jolies, et vite')
+  expect(toasts.some(t => t.includes('changé'))).toBe(true)
+  expect(await libelles(ui)).toContain('Améliorer le prompt')
+  await ui.unmount()
+})
+
+test('« Améliorer le prompt » : un modèle qui refuse l appel ne bloque pas le bouton', async ($, on) => {
+  const toasts: string[] = []
+  on('prompt.read', async () => ({ value: { text: 'refais-les', cursor: 10 } }) as never)
+  on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
+  on('model.complete', async () => { throw new Error('modèle non autorisé') })
+  await preparer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'plume' })
+  expect(toasts.some(t => t.includes('Amélioration impossible'))).toBe(true)
+  expect(await libelles(ui)).toContain('Améliorer le prompt')
+  await ui.unmount()
+})
+
 test('carillon : sous Windows, c est PowerShell qui joue le son du mod (le moteur n y joue rien)', async ($, on) => {
   mock.env(on, { OS: 'Windows_NT', USERPROFILE: 'C:/Users/essai' })
   const lances: string[] = []
