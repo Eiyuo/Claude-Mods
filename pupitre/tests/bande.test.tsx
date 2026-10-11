@@ -64,3 +64,49 @@ test('au repos, la jauge tient sur une seule ligne', async ($, on) => {
     await ui.unmount()
   }
 })
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function preparer($: any, on: any) {
+  mock.store(on)
+  const horloge = mock.clock(on, { now: 1_000_000 })
+  on('tool.call', async () => ({ result: { text: 'contenu' } }) as never)
+  on('turn.start', async () => ({ turnId: 't1' }))
+  on('turn.complete', async () => ({ text: '' }))
+  await $.command.run({ command: 'pupitre', args: '' })
+  return horloge
+}
+
+test('la jauge reste en bas, au plus près de la zone de texte ; /fil au-dessus', async ($, on) => {
+  await preparer($, on)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const alts = (await ui.findAll({ type: 'Svg' })).map(x => String(x.props.alt))
+  expect(alts[0]!.startsWith('Claude')).toBe(true)
+  expect(alts[alts.length - 1]!.startsWith('Limite 7 jours')).toBe(true)
+  await ui.unmount()
+  const t = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE })
+  const texte = JSON.stringify(await t.drawn())
+  expect(texte.indexOf('Claude')).toBeLessThan(texte.indexOf('Contexte'))
+  await t.unmount()
+})
+
+test('travail fini : la barre reste, avec « Fermer », jusqu à ce qu on la ferme', async ($, on) => {
+  const horloge = await preparer($, on)
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
+  await $.tool.call({ tool: 'Read', input: { file_path: 'a.md' }, agentId: 'a1' } as never)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(await ui.find({ type: 'Button', text: 'Fermer' })).toBeUndefined() // pas pendant le travail
+  await $.turn.complete({ answer: '', durationMs: 5000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  await horloge.advance(10_000)
+  const avant = JSON.stringify(await ui.drawn())
+  expect(avant).toContain('Claude')
+  expect(avant).toContain('Sous-agent')
+  expect(await ui.findAll({ type: 'Button', text: 'Fermer' })).toHaveLength(1)
+  await ui.press({ key: 'fermer-fil' })
+  const apres = JSON.stringify(await ui.drawn())
+  expect(apres).not.toContain('Claude')
+  expect(apres).not.toContain('Sous-agent')
+  expect(apres).toContain('Contexte') // la jauge reste
+  await ui.unmount()
+})

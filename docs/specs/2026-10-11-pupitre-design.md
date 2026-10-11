@@ -104,11 +104,13 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 
 ## 6. La bande au-dessus de la zone de texte
 
-- **Ordre.** La jauge en haut, puis /fil.
+- **Ordre.** De haut en bas : les autres discussions, /fil, puis la jauge. La jauge reste toujours au plus près de la zone de texte (demande du 11/10/2026).
+- **Jauge sur une ligne.** « Contexte ▰▰▱ 86 % · Limite 5 h ▰▱▱ 14 % ↻ 2 h 12 · Limite 7 jours ▰▰▱ 31 % ↻ 5 j 5 h », puis les boutons à droite. Les barres prennent la place qui reste (20 colonnes au plus) ; sous 6 colonnes, les comptes à rebours « ↻ » quittent la ligne. Le détail (jetons, phrase de remise à zéro) est dans l'info-bulle de chaque barre.
+- **Taille des barres.** Chaque `Svg` reçoit `width` et `height` : sans eux, le bureau donne 150 px de haut au cadre interactif.
 - **Affichage.** Rien ne s'affiche quand tout est éteint, ou quand /fil n'a rien à montrer et que la jauge est éteinte.
 - **Pas de redessin à vide.** La bande n'est redessinée que quand une valeur change : nouvelle mesure, tâche, étape, sous-agent, autre session, ou chaque seconde pour le chrono quand /fil est actif. Le scintillement et le reflet tournent seuls dans le SVG.
 - **Survey.** Quand `hasSurvey` est vrai, la bande cède la place.
-- **Hauteur.** Si `maxRows` est trop petit, la jauge passe sur une ligne, sans les textes de remise à zéro, et /fil ne montre plus que la ligne de Claude.
+- **Hauteur.** Si `maxRows` est trop petit (moins de 3), la jauge ne garde que ses boutons ; sous 8, /fil ne montre plus que la ligne de Claude.
 
 ## 7. Style des barres (commun à /fil et /jauge)
 
@@ -199,7 +201,7 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 
 - **Une ligne par sous-agent**, de son lancement (`agent.spawn`) à sa fin. Elle est reconnue par l'`agentId` de ses appels d'outils. Son libellé est la description donnée au lancement.
 - **Même barre que Claude.** Même règle d'avancement (sa propre liste de tâches, sinon l'estimation), mêmes mots d'étape, même fin en vert.
-- **Après la fin.** Une ligne terminée reste 4 s, puis disparaît.
+- **Après la fin.** Un sous-agent qui finit pendant que Claude travaille encore : sa ligne reste 4 s, puis disparaît. À la fin de la réponse, toutes les lignes restent (voir 9.4).
 
 ### 9.3 Les autres discussions
 
@@ -210,7 +212,8 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 
 ### 9.4 Fin et son
 
-- **Fin.** Quand la réponse se termine, tout passe au vert, puis la bande /fil se replie après 4 s.
+- **Fin.** Quand la réponse se termine, tout passe au vert et reste affiché. Un bouton « Fermer », au bout de la première ligne, retire les barres /fil ; sinon elles sont remplacées à la demande suivante (demande du 11/10/2026).
+- **Rechargement.** Au démarrage de la session (ou au rechargement du mod), les lignes /fil sont vidées : aucune barre ne reste figée.
 - **Son.** Le carillon `assets/carillon.wav` est joué si la réponse a duré plus de 30 s. C'est un carillon doux de 2 notes (mi puis la, environ 0,6 s, sons sinusoïdaux qui s'atténuent), fabriqué par `outils/carillon.py`. Rien n'est téléchargé.
 
 ## 10. /cap, /relais, /plume

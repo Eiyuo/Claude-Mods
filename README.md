@@ -25,7 +25,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 ### La jauge (`/jauge`)
 
-Trois petites barres, au-dessus de la zone de texte :
+Une seule ligne juste au-dessus de la zone de texte, avec trois petites barres :
 
 - **Contexte** : la part de la mémoire de conversation de Claude déjà remplie (par exemple « 42 % · 84 k / 200 k jetons »). Quand elle approche de 100 %, Claude commence à oublier le début : c'est le moment de passer le relais.
 - **Limite 5 h** : ta consommation sur la fenêtre de 5 heures, et le temps avant sa remise à zéro.
@@ -38,6 +38,8 @@ Les couleurs :
 | Violet | Moins de 75 % |
 | Orange | De 75 à 90 % |
 | Rouge | 90 % et plus |
+
+Le symbole **↻** donne le temps avant la remise à zéro (il quitte la ligne si la place manque). Passe la souris sur une barre pour voir le détail : nombre de jetons, ou la phrase complète.
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 
@@ -62,9 +64,13 @@ Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Ma
 | 66 à 99 % | Turquoise |
 | Terminé | Vert, avec « ✓ Fini » et une petite gerbe de pixels |
 
-**Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa propre ligne, avec la même barre. Elle disparaît 4 secondes après qu'il a fini.
+**Où.** Les barres du fil s'affichent au-dessus de la jauge : la jauge reste toujours au plus près de la zone de texte.
 
-**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît en bas sur une ligne fine, sous « Autres discussions en cours ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre.
+**Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa propre ligne, avec la même barre. S'il finit pendant que Claude travaille encore, sa ligne disparaît 4 secondes après.
+
+**À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. Le bouton **« Fermer »**, au bout de la ligne de Claude, les retire. Sinon, elles sont remplacées à ta demande suivante.
+
+**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît en haut de la bande sur une ligne fine, sous « Autres discussions en cours ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre.
 
 **Le son.** Un carillon doux de deux notes sonne quand Claude a fini, si la réponse a pris plus de 30 secondes. Pas de son pour les réponses rapides.
 

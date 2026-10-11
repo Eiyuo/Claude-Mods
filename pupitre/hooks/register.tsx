@@ -82,6 +82,12 @@ async function ameliorer($: Dollar): Promise<void> {
   }
 }
 
+async function fermerFil($: Dollar): Promise<void> {
+  if ([...suivis.values()].some(s => s.fin === null)) return // seulement une fois le travail fini
+  suivis.clear()
+  await majLignes($)
+}
+
 async function revenir($: Dollar): Promise<void> {
   const p = await read($, plumeA)
   if (p.original === null) return
@@ -124,6 +130,7 @@ export const register: Register = on => {
     await $.command.register({ name: 'cap', description: 'Claude te pose ses questions pour fixer la suite' })
     const garde = lireReglages(await $.store.get('reglages'))
     await update($, reglagesA, () => garde)
+    await update($, lignesA, () => []) // suivis repart à vide (nouvelle session ou mod rechargé) : pas de barre orpheline
 
     const u = await $.session.usage()
     derniereUsage = { context: u.context, rateLimits: u.rateLimits }
@@ -229,17 +236,26 @@ export const register: Register = on => {
     if (!e.agentId && e.durationMs > SEUIL_SON_MS && !e.isAborted && (await read($, reglagesA)).fil) {
       void $.audio.play({ asset: 'assets/carillon.wav' }).catch(() => { /* pas de sortie audio */ })
     }
-    const s = suivis.get(id)
-    if (s && s.fin === null) {
+    if (!e.agentId) {
+      // fin de la réponse : tout passe au vert et reste affiché jusqu'à « Fermer » ou la prochaine demande
       const maintenant = await $.clock.now()
-      suivis.set(id, finir(s, maintenant))
-      await majLignes($)
-      $.clock.after(4000, () => {
-        void (async () => {
-          const t = suivis.get(id)
-          if (t && t.fin !== null) { suivis.delete(id); await majLignes($) }
-        })()
-      })
+      let change = false
+      for (const [k, s] of suivis) if (s.fin === null) { suivis.set(k, finir(s, maintenant)); change = true }
+      if (change) await majLignes($)
+    } else {
+      // un sous-agent fini pendant que Claude travaille encore : sa ligne part après 4 s
+      const s = suivis.get(id)
+      if (s && s.fin === null) {
+        const maintenant = await $.clock.now()
+        suivis.set(id, finir(s, maintenant))
+        await majLignes($)
+        $.clock.after(4000, () => {
+          void (async () => {
+            const t = suivis.get(id)
+            if (t && t.fin !== null && tourEnCours) { suivis.delete(id); await majLignes($) }
+          })()
+        })
+      }
     }
     if (!e.agentId && relaisDepuis !== null) {
       const debut = relaisDepuis
@@ -292,6 +308,7 @@ export const register: Register = on => {
       maintenant: await read($, maintenantA),
       boutons,
       majJauge: 0,
+      fermer: () => { void fermerFil($) },
     })
     return arbre === null ? next(e) : (arbre as never)
   })

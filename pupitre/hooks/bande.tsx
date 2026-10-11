@@ -66,13 +66,14 @@ export function dessinerJauge(T: Elements, surface: string, colonnes: number, me
 export type EtatBande = {
   reglages: Reglages; mesures: Mesures; lignes: readonly LigneFil[]; autres: readonly Autre[]
   maintenant: number; boutons: readonly Bouton[]; majJauge: number
+  fermer?: () => void // « Fermer » : retire les barres /fil une fois le travail fini
 }
 
-const COL_QUI = 14, COL_COMPTEUR = 8, COL_CHRONO = 8
+const COL_QUI = 14, COL_COMPTEUR = 8, COL_CHRONO = 8, COL_FERMER = 10
 
-function ligne(T: Elements, surface: string, colonnes: number, l: LigneFil, maintenant: number) {
-  const { Box, Text, Svg } = T
-  const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4)
+function ligne(T: Elements, surface: string, colonnes: number, l: LigneFil, maintenant: number, fermer?: () => void) {
+  const { Box, Text, Svg, Button } = T
+  const largeur = Math.max(10, colonnes - COL_QUI - COL_COMPTEUR - COL_CHRONO - 4 - (fermer ? COL_FERMER : 0))
   const fin = l.finiLe ?? maintenant
   const w = Math.max(40, Math.round(largeur * PX_COL))
   const barre = surface === 'terminal' || Svg === undefined
@@ -87,6 +88,7 @@ function ligne(T: Elements, surface: string, colonnes: number, l: LigneFil, main
       </Box>
       <Box width={COL_COMPTEUR} justifyContent="flex-end"><Text dimColor>{l.compteur}</Text></Box>
       <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor>{chrono(fin - l.debut)}</Text></Box>
+      {fermer ? <Button key="fermer-fil" label="Fermer" onPress={() => fermer()} /> : null}
     </Box>
   )
 }
@@ -99,11 +101,14 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   if (!jauge && lignes.length === 0 && autres.length === 0) return null
   const barreJauge = jauge ? dessinerJauge(T, surface, colonnes, s.mesures, s.reglages.jauge && maxRows >= 3, s.boutons, s.majJauge) : null
   if (lignes.length === 0 && autres.length === 0) return barreJauge // au repos : une seule ligne
+  // « Fermer » sur la première ligne, une fois que tout est fini
+  const fermer = s.fermer && lignes.length > 0 && lignes.every(l => l.fini) ? s.fermer : undefined
+  // de haut en bas : autres discussions, /fil, puis la jauge, toujours au plus près de la zone de texte
   return (
     <Box flexDirection="column" gap={1}>
+      {autres.length > 0 ? dessinerAutres(T, surface, colonnes, autres, s.maintenant) : null}
+      {lignes.map((l, i) => ligne(T, surface, colonnes, l, s.maintenant, i === 0 ? fermer : undefined))}
       {barreJauge}
-      {lignes.map(l => ligne(T, surface, colonnes, l, s.maintenant))}
-      {autres.length > 0 && dessinerAutres(T, surface, colonnes, autres, s.maintenant)}
     </Box>
   )
 }
