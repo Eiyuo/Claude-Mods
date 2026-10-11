@@ -478,6 +478,22 @@ test('« Améliorer le prompt » : un modèle qui refuse l appel ne bloque pas l
   await ui.unmount()
 })
 
+test('première installation : sans réglage enregistré, la bande s affiche sans taper /pupitre', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: 1_000_000 })
+  mock.env(on, { USERPROFILE: 'C:/Users/essai' })
+  on('session.start', async (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
+  on('command.register', async () => ({ value: undefined }) as never)
+  on('session.id', async () => ({ value: 'moi' }) as never)
+  on('session.cwd', async () => ({ value: 'C:/Users/essai/ici' }) as never)
+  on('session.usage', async () => ({ value: { context: { window: 200_000 }, rateLimits: [] } }) as never)
+  on('ui.render', async () => ({ type: 'Text', props: {}, children: ['(bande du moteur)'] }) as never)
+  await $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
+  await ui.unmount()
+})
+
 test('carillon : sous Windows, c est PowerShell qui joue le son du mod (le moteur n y joue rien)', async ($, on) => {
   mock.env(on, { OS: 'Windows_NT', USERPROFILE: 'C:/Users/essai' })
   const lances: string[] = []

@@ -16,6 +16,7 @@ const NOMS: Record<Exclude<Commande, 'pupitre'>, readonly [string, string, strin
 }
 
 export function lireReglages(v: unknown): Reglages {
+  if (v === undefined) return { ...TOUT } // jamais réglé (première installation) : tout allumé, sans taper /pupitre
   const o = (typeof v === 'object' && v !== null ? v : {}) as Record<string, unknown>
   return { jauge: o.jauge === true, fil: o.fil === true, cap: o.cap === true, relais: o.relais === true, plume: o.plume === true }
 }

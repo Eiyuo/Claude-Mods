@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.0) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.1) |
 
 ## Installation
 
@@ -18,7 +18,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
    ```
    claude plugin install pupitre@claude-mods
    ```
-3. Ouvre une nouvelle conversation, dans l'application ou dans le terminal, et tape `/pupitre` une fois. Le réglage est gardé : ensuite, le mod se charge tout seul à chaque lancement de Claude.
+3. Ouvre une nouvelle conversation, dans l'application ou dans le terminal : la bande apparaît au-dessus de la zone de texte, tout est allumé. Le mod se charge ensuite tout seul à chaque lancement de Claude. `/pupitre` éteint tout, ou rallume tout.
 
 **Mettre à jour.** Les mises à jour ne sont pas automatiques. Quand une nouvelle version sort, lance ces deux commandes, puis ferme et rouvre Claude :
 

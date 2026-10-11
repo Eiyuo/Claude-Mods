@@ -97,7 +97,7 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 | `/cap` | Pose les questions de cap tout de suite (rien à allumer) |
 
 **Réglages.**
-- Ils sont rangés dans `$.store`, sous la clé `reglages = { jauge, fil, relais, plume, cap }` (booléens). Au premier usage, tout est éteint.
+- Ils sont rangés dans `$.store`, sous la clé `reglages = { jauge, fil, relais, plume, cap }` (booléens). Tant que rien n'est enregistré (première installation), tout est allumé, sans taper `/pupitre` (1.0.1 : avant, une installation neuve n'affichait rien). Un choix enregistré, même « tout éteint », est respecté. Chaque installation a ses propres réglages : la copie de développement et le mod installé ne les partagent pas.
 - `/pupitre` met aussi `cap` à vrai : il n'a pas d'élément visible, mais il sert à `/pupitre` pour savoir si « tout est allumé ».
 - Chaque changement affiche un message, par exemple « Pupitre : fil éteint ».
 - `/relais` et `/plume` allumés sans `/jauge` : la jauge s'affiche quand même, réduite à leurs boutons, qui doivent rester accessibles.
@@ -260,7 +260,7 @@ Elles remplacent ce qui, plus haut, les contredit.
 - **Sous-agents.** Un sous-agent fini reste affiché, vert, jusqu'à la croix (plus de départ au bout de 4 s).
 - **Cache.** À la fin de chaque réponse, `turn.complete` donne `usage` : « Cache 82 % » (lu dans le cache / entrée totale) s'affiche à gauche de la ligne des boutons quand la jauge est allumée.
 - **/cap automatique.** `/cap` bascule `cap`, comme les autres commandes. Allumé, un `prompt.submit` joint `CONSIGNE_CAP_AUTO` au `context` de chaque message de l'utilisateur (sauf une commande « / ») : à la fin du travail, Claude pose « Et maintenant, on fait quoi ? » avec AskUserQuestion et 3 suites. Vérifié dans le terminal : le contexte d'un message de l'utilisateur arrive à Claude, alors que le prompt système d'un mod (`prompt.compose`, `prompt.context`) n'est pas consulté.
-- **Relais au bon moment.** Réglage `{ seuil, auto }` gardé dans `$.store` (clé `relais`), seuil de 30 à 90 % par pas de 5, 60 % par défaut. À chaque `session.measure`, au-delà du seuil : le bouton devient « Passer le relais · 62 % » et une notification prévient une fois par dépassement ; en automatique, le relais se lance s'il n'y a pas de tour en cours.
+- **Relais au bon moment.** Réglage `{ seuil, auto }` gardé dans `$.store` (clé `relais`), seuil de 30 à 90 % par pas de 5, 60 % par défaut. À chaque `session.measure`, au-delà du seuil : le bouton devient « Passer le relais · 62 % » et une notification prévient une fois par dépassement ; en automatique, le relais se lance à la fin du tour (jamais au milieu du travail). Le mod suit le tour qui porte la consigne du relais (`turnId`), car la demande d'un mod ne part qu'au repos ; il cherche `relais.md` à la racine du projet (`$.session.root()`).
 - **relais.md.** Première ligne `<!-- Conversation d'origine : claude --resume <id> -->`, puis `STATUT : À REPRENDRE` ou `ATTENDRE`, puis Objectif, Contraintes permanentes, Dernière demande (mot pour mot), Ce qui a été fait, État actuel (vérifié), Comment vérifier, Décisions, Pistes écartées, Prochaines étapes (avec la question exacte si ATTENDRE), Blocages, Fichiers clés (chemins relatifs). La phrase de reprise vérifie l'état, puis repart des prochaines étapes, ou pose la question en attente si le statut est ATTENDRE.
 
 ## 11. Cas particuliers et limites

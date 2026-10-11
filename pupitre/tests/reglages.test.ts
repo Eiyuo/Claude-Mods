@@ -27,8 +27,11 @@ describe('réglages', () => {
     expect(basculer(AUCUN, 'relais').message).toBe('Pupitre : bouton « Passer le relais » allumé')
     expect(basculer(AUCUN, 'plume').message).toBe('Pupitre : bouton « Améliorer le prompt » allumé')
   })
+  test('jamais réglé (première installation) : tout est allumé ; un choix enregistré, même « tout éteint », est respecté', async () => {
+    expect(toutAllume(lireReglages(undefined))).toBe(true)
+    expect(lireReglages(AUCUN)).toEqual(AUCUN)
+  })
   test('lireReglages accepte n importe quoi et ne garde que des booléens vrais', async () => {
-    expect(lireReglages(undefined)).toEqual(AUCUN)
     expect(lireReglages('x')).toEqual(AUCUN)
     expect(lireReglages({ jauge: true, fil: 'oui', cap: 1 })).toEqual({ ...AUCUN, jauge: true })
   })
