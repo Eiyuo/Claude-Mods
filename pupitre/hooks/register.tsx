@@ -297,7 +297,7 @@ export const register: Register = on => {
       // la demande d'un mod commence par « The <mod> plugin sent a message: » : le titre est la ligne d'après
       const lignes = e.text.split('\n').map(l => l.trim()).filter(Boolean)
       const titre = /plugin sent a message:$/.test(lignes[0] ?? '') ? lignes[1] : lignes[0]
-      if (titre) demandeTour = titre
+      if (titre && !titre.startsWith('<')) demandeTour = titre // un message technique (« <agent-message … ») garde le titre
       if ((await read($, reglagesA)).fil) {
         const maintenant = await $.clock.now()
         suivis.set('claude', debutTour(suivis.get('claude') ?? nouveauSuivi(maintenant), maintenant))

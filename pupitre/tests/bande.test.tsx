@@ -303,6 +303,18 @@ test('une demande envoyée par un mod : le titre est sa demande, pas la phrase q
   await ui.unmount()
 })
 
+test('un tour relancé par un message technique (« <agent-message … ») garde le titre de ta demande', async ($, on) => {
+  await preparer($, on)
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  await $.turn.start({ text: '<agent-message from="a1">résumé du sous-agent</agent-message>', turnId: 't2' } as never)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE })
+  const texte = JSON.stringify(await ui.drawn())
+  expect(texte).toContain('fais ceci')
+  expect(texte).not.toContain('agent-message')
+  await ui.unmount()
+})
+
 test('« Effacer les barres finies » : dès 2 barres finies, retire les vertes et garde celles en cours', async ($, on) => {
   await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
