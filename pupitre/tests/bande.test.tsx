@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
-import { PAR_CAR_BUREAU, dispositionJauge } from '../hooks/bande'
+import { PAR_CAR_BUREAU, dispositionJauge, titreAutre } from '../hooks/bande'
 import { CONSIGNE_CAP_AUTO } from '../hooks/textes'
 import { ficheDe } from '../hooks/partage'
 import type { LigneFil } from '../types'
@@ -40,6 +40,11 @@ describe('disposition de la jauge sur une ligne', () => {
       if (!(d.abrege && d.barre === 4)) expect(total).toBeLessThanOrEqual(c) // le plancher seul peut déborder ; les textes se coupent alors avec « … »
     }
   })
+})
+
+test('titre d une autre discussion : le dossier raccourci laisse la place à la demande', async () => {
+  expect(titreAutre('Envoie 2 sous-agents en parallèle', 'essai-relais')).toBe('Envoie 2 sous-… · essai-r…')
+  expect(titreAutre('Ajoute du beurre', 'Atelier')).toBe('Ajoute du beurre · Atelier')
 })
 
 test('pendant le travail, la bande dessine la ligne de Claude sur chaque surface', async ($, on) => {

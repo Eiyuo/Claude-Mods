@@ -176,11 +176,17 @@ function tronquer(t: string, n: number): string {
   return t.length <= n ? t : `${t.slice(0, Math.max(1, n - 1))}…`
 }
 
+// « demande · dossier », le dossier raccourci à 8 caractères pour laisser la place à la demande.
+export function titreAutre(demande: string, dossier: string): string {
+  const d = tronquer(dossier, 8)
+  return `${tronquer(demande, Math.max(8, COL_TITRE - d.length - 3))} · ${d}`
+}
+
 function depuisAutre(a: Autre, fermer?: (id: string) => void): Rang {
   const fini = a.finiLe !== null
   return {
     cle: a.id, icone: fini ? '✓' : '●', secondaire: false,
-    titre: `${tronquer(a.demande || a.tache || 'Discussion', Math.max(8, COL_TITRE - a.titre.length - 3))} · ${a.titre}`,
+    titre: titreAutre(a.demande || a.tache || 'Discussion', a.titre),
     progression: a.progression, avant: a.progression, niveau: a.niveau, niveauAvant: a.niveau, fini, eclat: false,
     mot: a.mot || (fini ? '✓ Fini' : 'En cours'), majLe: a.majLe, debut: a.debut, finiLe: a.finiLe,
     fermer: fini && fermer ? { cle: `fermer-${a.id}`, action: () => fermer(a.id) } : undefined,
