@@ -22,7 +22,7 @@ Recréer, dans un seul mod Claude Code, cinq fonctions vues dans une vidéo, san
 |---|---|
 | Découpage | **Un seul mod, « pupitre »**, qui regroupe les 5 fonctions |
 | Activation | **/pupitre** allume les 5 fonctions d'un coup. Si tout est déjà allumé, il éteint tout. **/jauge, /fil, /relais, /plume** allument ou éteignent leur seule fonction. **/cap** agit quand on le tape. Le choix est gardé d'une session à l'autre, et un message confirme chaque changement |
-| Rangement | Dépôt GitHub privé `Eiyuo/Claude-Mods`, à part du projet REX. Installé une fois sur chaque PC, il vaut pour tous les projets |
+| Rangement | Dépôt GitHub public `Eiyuo/Claude-Mods`, à part des projets de travail. Installé une fois sur chaque PC, il vaut pour tous les projets |
 | /fil, ce qui est mesuré | Tâches finies sur tâches prévues, une ligne pour Claude et une par sous-agent (option 3) |
 | /fil, autres fenêtres | Une ligne fine par autre discussion qui travaille (option 1) |
 | /fil, style | Celui du curseur d'effort « Ultracode » de l'application : piste claire, pixels colorés, curseur. Dans la version « Après » : trame ordonnée, relief, scintillement doux, reflet en biais, apparition des pixels |
@@ -273,7 +273,7 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
   - un vrai travail avec tâches et sous-agent ;
   - une deuxième fenêtre ;
   - le son ;
-  - /relais dans le projet REX ;
+  - /relais dans un vrai projet ;
   - /plume sur une demande dictée.
 
 ## 13. Installation

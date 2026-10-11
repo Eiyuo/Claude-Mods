@@ -186,24 +186,24 @@ test('autre discussion finie : sa ligne reste, avec sa croix, même une fois l a
   const horloge = await preparer($, on)
   await $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
   const L: LigneFil = { id: 'claude', qui: 'Claude', tache: 'En cours', mot: 'Lecture', compteur: '≈', progression: 0.3, avant: 0, niveau: 1, niveauAvant: 1, fini: false, eclat: false, debut: horloge.now(), majLe: horloge.now(), finiLe: null }
-  const poser = (l: LigneFil) => { ecriteLe = horloge.now(); fiche = JSON.stringify(ficheDe('autre', 'REX', l, ecriteLe)) }
+  const poser = (l: LigneFil) => { ecriteLe = horloge.now(); fiche = JSON.stringify(ficheDe('autre', 'Atelier', l, ecriteLe)) }
   poser(L)
   await horloge.advance(2_000)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   const croix = async () => (await ui.findAll({ type: 'Button' })).filter(b => b.key === 'fermer-autre')
-  expect(JSON.stringify(await ui.drawn())).toContain('REX')
+  expect(JSON.stringify(await ui.drawn())).toContain('Atelier')
   expect(await croix()).toHaveLength(0) // pas pendant le travail
   poser({ ...L, fini: true, finiLe: horloge.now(), tache: 'Terminé', compteur: '✓', progression: 1, niveau: 3 })
   await horloge.advance(2_000)
   fiche = '' // l'autre discussion se ferme
   await horloge.advance(60_000)
   const reste = JSON.stringify(await ui.drawn())
-  expect(reste).toContain('REX')
+  expect(reste).toContain('Atelier')
   expect(reste).toContain('Terminé')
   const [x] = await croix()
   expect(x!.props.label).toBe('×')
   await ui.press({ key: 'fermer-autre' })
-  expect(JSON.stringify(await ui.drawn())).not.toContain('REX')
+  expect(JSON.stringify(await ui.drawn())).not.toContain('Atelier')
   await ui.unmount()
 })
 

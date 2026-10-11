@@ -6,7 +6,7 @@ const L: LigneFil = { id: 'claude', qui: 'Claude', tache: 'Tâche 2 · B', mot: 
 
 describe('partage', () => {
   test('fiche écrite puis relue', async () => {
-    const f = ficheDe('s1', 'REX AT', L, 1000)
+    const f = ficheDe('s1', 'Mon Projet', L, 1000)
     expect(lireFiche(JSON.stringify(f))).toEqual(f)
     expect(f.actif).toBe(true)
   })
@@ -53,7 +53,7 @@ describe('partage', () => {
   })
   test('nom de fichier sûr et titre', async () => {
     expect(nomFichier('abc/../d:e')).toBe('abc____d_e.json')
-    expect(titreDe('C:\\Users\\x\\Desktop\\Coding\\REX AT')).toBe('REX AT')
+    expect(titreDe('C:\\Users\\x\\Desktop\\Coding\\Mon Projet')).toBe('Mon Projet')
     expect(titreDe('/home/x/projet/')).toBe('projet')
   })
 })
