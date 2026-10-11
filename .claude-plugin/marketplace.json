@@ -1,0 +1,14 @@
+{
+  "name": "claude-mods",
+  "owner": {
+    "name": "Eiyuo"
+  },
+  "description": "Mods Claude Code personnels (Eiyuo).",
+  "plugins": [
+    {
+      "name": "pupitre",
+      "source": "./pupitre",
+      "description": "Jauge (contexte, limites 5 h et 7 jours), barres de progression de Claude et des sous-agents, /cap, /relais et /plume."
+    }
+  ]
+}
