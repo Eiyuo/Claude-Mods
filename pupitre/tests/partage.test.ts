@@ -27,6 +27,11 @@ describe('partage', () => {
     expect(ficheDe('s1', 'X', undefined, 1000).actif).toBe(false)
     expect(ficheDe('s1', 'X', { ...L, fini: true }, 1000).actif).toBe(false)
   })
+  test('les textes lus dans la fiche d une autre discussion sont bornés à 200 caractères', async () => {
+    const long = 'x'.repeat(5000)
+    const r = lireFiche(JSON.stringify({ ...ficheDe('s1', 'A', L, 1000), titre: long, tache: long, compteur: long, demande: long, mot: long }))
+    for (const k of ['titre', 'tache', 'compteur', 'demande', 'mot'] as const) expect(r![k]).toHaveLength(200)
+  })
   test('fichier vide, à moitié écrit ou faux : ignoré', async () => {
     expect(lireFiche('')).toBe(null)
     expect(lireFiche('{"id":"s1","titre":')).toBe(null)

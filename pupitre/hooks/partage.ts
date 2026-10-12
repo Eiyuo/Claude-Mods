@@ -28,11 +28,12 @@ export function lireFiche(texte: string): Fiche | null {
   const n = (k: string) => typeof o[k] === 'number' && Number.isFinite(o[k])
   if (!s('id') || !s('titre') || !s('tache') || !s('compteur') || !n('progression') || !n('debut') || !n('majLe') || typeof o.actif !== 'boolean') return null
   const niveau: Niveau = typeof o.niveau === 'number' && Number.isInteger(o.niveau) && o.niveau >= 0 && o.niveau <= 6 ? o.niveau as Niveau : 0
+  const t = (k: string) => (o[k] as string).slice(0, 200) // la fiche d'une autre discussion n'alourdit pas la bande
   return {
-    id: o.id as string, titre: o.titre as string, tache: o.tache as string, compteur: o.compteur as string,
+    id: o.id as string, titre: t('titre'), tache: t('tache'), compteur: t('compteur'),
     progression: o.progression as number, niveau, debut: o.debut as number, majLe: o.majLe as number, actif: o.actif as boolean,
     finiLe: n('finiLe') ? o.finiLe as number : null, // ces trois-là manquent aux fiches d'une version précédente
-    demande: s('demande') ? o.demande as string : '', mot: s('mot') ? o.mot as string : '',
+    demande: s('demande') ? t('demande') : '', mot: s('mot') ? t('mot') : '',
     attente: o.attente === true, // absente des fiches d'avant la 1.0.5
   }
 }

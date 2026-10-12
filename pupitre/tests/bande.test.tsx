@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import { PAR_CAR_BUREAU, dispositionJauge, titreAutre } from '../hooks/bande'
-import { CONSIGNE_CAP_AUTO } from '../hooks/textes'
+import { CONSIGNE_CAP_AUTO, DEBUT_RELAIS } from '../hooks/textes'
 import { ficheDe } from '../hooks/partage'
 import type { LigneFil } from '../types'
 
@@ -388,6 +388,7 @@ test('relais : la demande part toute seule, consigne entière dans le message', 
 test('relais : si la demande ne part pas, elle attend dans la zone de texte', async ($, on) => {
   const remplis: string[] = []
   on('prompt.submit', async () => ({ drop: 'session occupée' }) as never)
+  on('prompt.read', async () => ({ value: { text: '', cursor: 0 } }) as never) // zone de texte vide
   on('prompt.fill', async ($, e) => { remplis.push(e.text); return { isFilled: true } as never })
   const horloge = await preparer($, on)
   const ui = await monter($, 'desktop')
@@ -578,6 +579,7 @@ test('relais demandé pendant un tour : traité à la fin de son propre tour, re
   let relaisLe: number | null = null
   on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
   on('prompt.fill', async ($, e) => { boite = e.text; return { isFilled: true } as never })
+  on('prompt.read', async () => ({ value: { text: '', cursor: 0 } }) as never) // zone de texte vide
   on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
   on('command.run', { command: 'clear' }, async () => { commandes.push('clear'); return { text: '' } as never })
   on('session.root', async () => ({ value: 'C:/projet' }) as never)
@@ -671,14 +673,65 @@ test('première installation : sans réglage enregistré, la bande s affiche san
 test('carillon : sous Windows, c est PowerShell qui joue le son du mod (le moteur n y joue rien)', async ($, on) => {
   mock.env(on, { OS: 'Windows_NT', USERPROFILE: 'C:/Users/essai' })
   const lances: string[] = []
-  on('process.run', async ($, e) => { lances.push(e.argv.join(' ')); return { value: { exitCode: 0, stdout: '', stderr: '' } } as never })
+  const sons: (string | undefined)[] = []
+  on('process.run', async ($, e) => { lances.push(e.argv.join(' ')); sons.push(e.init?.env?.PUPITRE_SON); return { value: { exitCode: 0, stdout: '', stderr: '' } } as never })
   await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
   await $.turn.complete({ answer: '', durationMs: 31_000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
   expect(lances).toHaveLength(1)
   expect(lances[0]).toContain('powershell')
-  expect(lances[0]).toContain('assets/carillon.wav')
+  expect(lances[0]).not.toContain('carillon.wav') // le chemin passe à part : une apostrophe ne casse pas la commande
+  expect(sons[0]).toMatch(/assets\/carillon\.wav$/)
 })
+
+test('relais : un brouillon tapé pendant le relais n est jamais écrasé', async ($, on) => {
+  const remplis: string[] = []
+  const toasts: string[] = []
+  const commandes: string[] = []
+  on('prompt.submit', async () => ({ drop: 'session occupée' }) as never)
+  on('prompt.read', async () => ({ value: { text: 'mon brouillon', cursor: 13 } }) as never)
+  on('prompt.fill', async ($, e) => { remplis.push(e.text); return { isFilled: true } as never })
+  on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
+  on('command.run', { command: 'clear' }, async () => { commandes.push('clear'); return { text: '' } as never })
+  on('session.root', async () => ({ value: 'C:/projet' }) as never)
+  on('fs.stat', async () => ({ value: { kind: 'file', size: 10, mtimeMs: 2_000_000_000_000, isLink: false } }) as never)
+  const horloge = await preparer($, on)
+  const ui = await monter($, 'desktop')
+  await ui.press({ key: 'relais' })
+  await horloge.advance(10)
+  await $.turn.start({ text: `${DEBUT_RELAIS} à la racine du projet`, turnId: 't2' } as never)
+  await $.turn.complete({ answer: '', durationMs: 1000, isAborted: false, turnId: 't2', reason: 'answer' } as never)
+  await horloge.advance(400)
+  expect(commandes).toEqual(['clear']) // le relais est allé au bout
+  expect(remplis).toEqual([]) // ni la demande refusée, ni « Lis relais.md » ne remplacent le brouillon
+  expect(toasts.some(t => t.includes('Lis relais.md'))).toBe(true)
+  await ui.unmount()
+})
+
+for (const [nom, env] of [['Windows', { OS: 'Windows_NT', USERPROFILE: 'C:/Users/essai' }], ['macOS', { HOME: '/Users/essai' }]] as const) {
+  test(`au démarrage, les fiches partagées de plus d une heure sont effacées (${nom})`, async ($, on) => {
+    const lances: { argv: readonly string[]; env?: Readonly<Record<string, string>> }[] = []
+    mock.env(on, env)
+    on('process.run', async ($, e) => { lances.push({ argv: e.argv, env: e.init?.env }); return { value: { exitCode: 0, stdout: '', stderr: '' } } as never })
+    on('session.start', async (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
+    on('command.register', async () => ({ value: undefined }) as never)
+    on('session.id', async () => ({ value: 'moi' }) as never)
+    on('session.cwd', async () => ({ value: 'C:/Users/essai/ici' }) as never)
+    on('session.usage', async () => ({ value: { context: { window: 200_000 }, rateLimits: [] } }) as never)
+    const horloge = await preparer($, on)
+    await $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
+    await horloge.advance(0)
+    const dossier = `${'USERPROFILE' in env ? env.USERPROFILE : env.HOME}/.claude/pupitre/sessions`
+    expect(lances).toHaveLength(1)
+    if (nom === 'Windows') {
+      expect(lances[0]!.argv[0]).toBe('powershell.exe')
+      expect(lances[0]!.argv.join(' ')).toContain('AddHours(-1)')
+      expect(lances[0]!.env?.PUPITRE_FICHES).toBe(dossier)
+    } else {
+      expect(lances[0]!.argv).toEqual(['find', dossier, '-name', '*.json', '-mmin', '+60', '-delete'])
+    }
+  })
+}
 
 test('« Améliorer le prompt » : réécrit avec la conversation, et « Revenir à mon texte » reste jusqu à l envoi', async ($, on) => {
   const demandes: string[] = []

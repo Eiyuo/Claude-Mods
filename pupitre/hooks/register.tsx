@@ -75,6 +75,12 @@ async function boutonsDe($: Dollar, r: Reglages, pied: Pied, court = false): Pro
   return boutons
 }
 
+// Un brouillon tapé entre-temps n'est jamais écrasé : la zone de texte n'est remplie que vide.
+async function remplirSiVide($: Dollar, texte: string): Promise<boolean> {
+  if ((await $.prompt.read()).text.trim()) return false
+  return (await $.prompt.fill({ text: texte, mode: 'replace' })).isFilled
+}
+
 // Envoie une demande du mod hors du hook qui l'appelle : le moteur refuse un envoi fait depuis un command.run (il
 // attendrait le tour que ce hook tient). Si l'envoi échoue quand même, la demande attend dans la zone de texte.
 // La consigne entière est dans le texte : le moteur retire le contexte joint à l'envoi d'un mod, et sur l'application
@@ -85,7 +91,7 @@ function envoyer($: Dollar, texte: string): void {
       let refus: string | undefined
       try { refus = (await $.prompt.submit({ text: texte })).drop } catch (err) { refus = String(err) }
       if (refus === undefined) return
-      const { isFilled } = await $.prompt.fill({ text: texte, mode: 'replace' })
+      const isFilled = await remplirSiVide($, texte)
       $.ui.toast(isFilled ? 'Pupitre : appuie sur Entrée pour envoyer la demande.' : `Pupitre : la demande n'a pas pu partir (${refus}).`)
     })()
   })
@@ -182,8 +188,8 @@ async function ameliorer($: Dollar): Promise<void> {
 // Le moteur ne joue un son que sur macOS (afplay) ; sous Windows, il ne joue rien : PowerShell lit alors le fichier du mod.
 async function carillon($: Dollar): Promise<void> {
   if ((await $.env.get('OS')) !== 'Windows_NT') return $.audio.play({ asset: 'assets/carillon.wav' })
-  const wav = `${$.plugin.root}/assets/carillon.wav`.replace(/'/g, "''")
-  await $.process.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', `(New-Object Media.SoundPlayer '${wav}').PlaySync()`])
+  // le chemin passe par une variable : une apostrophe, droite ou courbe, y casserait la commande
+  await $.process.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', '(New-Object Media.SoundPlayer $env:PUPITRE_SON).PlaySync()'], { env: { PUPITRE_SON: `${$.plugin.root}/assets/carillon.wav` } })
 }
 
 async function fermerFil($: Dollar): Promise<void> {
@@ -296,6 +302,10 @@ export const register: Register = on => {
     // Partage avec les autres discussions du PC : chaque session écrit sa fiche et lit celles des autres.
     const maison = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')) ?? ''
     const dossier = `${maison}/.claude/pupitre/sessions`
+    // le mod n'a pas de quoi effacer un fichier : au démarrage, le système efface les fiches de plus d'une heure
+    if (maison) void $.process.run((await $.env.get('OS')) === 'Windows_NT'
+      ? ['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', 'Get-ChildItem -LiteralPath $env:PUPITRE_FICHES -Filter *.json | Where-Object LastWriteTime -lt (Get-Date).AddHours(-1) | Remove-Item']
+      : ['find', dossier, '-name', '*.json', '-mmin', '+60', '-delete'], { env: { PUPITRE_FICHES: dossier } }).catch(() => { /* dossier pas encore créé : rien à effacer */ })
     const moi = await $.session.id()
     const titre = titreDe(await $.session.cwd())
     let dernierEcrit = ''
@@ -431,7 +441,7 @@ export const register: Register = on => {
           void (async () => {
             try {
               await $.command.run({ command: 'clear' })
-              const { isFilled } = await $.prompt.fill({ text: REPRISE_RELAIS, mode: 'replace' })
+              const isFilled = await remplirSiVide($, REPRISE_RELAIS)
               $.ui.toast(isFilled ? 'Pupitre : relais passé. Appuie sur Entrée pour reprendre.' : 'Pupitre : relais passé. Pour reprendre, demande : « Lis relais.md et reprends ».')
             } catch {
               $.ui.toast('Pupitre : relais.md est écrit, mais la conversation n a pas pu être vidée. Tape /clear.')

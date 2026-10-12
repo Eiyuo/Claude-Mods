@@ -219,7 +219,7 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 ### 9.3 Les autres discussions
 
 - **Écriture.** Chaque session écrit son état dans `~/.claude/pupitre/sessions/<id de session>.json` : titre, avancement, tâche, étape, chrono, date. C'est fait au plus une fois par seconde, et seulement quand quelque chose change.
-- **Lecture.** Chaque session lit les fichiers des autres toutes les 2 s. Elle ignore ceux qui n'ont pas bougé depuis plus de 15 s (session fermée ou au repos) et supprime ceux de plus d'une heure.
+- **Lecture.** Chaque session lit les fichiers des autres toutes les 2 s. Elle ignore ceux qui n'ont pas bougé depuis plus de 15 s (session fermée ou au repos), et coupe leurs textes à 200 caractères. Au démarrage, elle efface ceux de plus d'une heure : le mod n'a pas de quoi effacer un fichier, c'est donc PowerShell qui s'en charge sous Windows, et `find` ailleurs.
 - **Affichage.** Sous « Autres discussions », une ligne fine par session : titre (sinon le nom du dossier du projet), tâche, barre fine (10 px), compteur et chrono.
 - **Fin.** Une discussion vue en cours puis finie garde sa ligne (verte, « Terminé », chrono arrêté), même une fois fermée, jusqu'à sa croix **×**, et au plus 5 s après sa fin (1.0.5). Fermée, elle ne revient qu'avec une nouvelle demande dans cette discussion. Une discussion disparue en plein travail (plantage) part au bout de 15 s, comme avant.
 - **Plantage.** Un fichier illisible ou à moitié écrit est ignoré : l'écriture passe par un fichier temporaire, ensuite renommé.

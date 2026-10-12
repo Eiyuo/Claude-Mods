@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.8) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.9) |
 
 ## Aperçu
 
@@ -195,7 +195,7 @@ Quand la conversation devient longue (jauge « Contexte » qui se remplit), cliq
 
    80 lignes au plus, sans ton nom, ton identifiant d'entreprise ni le chemin de ton dossier personnel.
 2. **`relais.md` n'est jamais enregistré dans git** : il reste sur ton ordinateur (Claude l'exclut de git pour cet ordinateur seulement, sans modifier le projet). Ainsi, il ne peut pas partir sur GitHub avec le reste.
-3. La conversation est vidée, et la zone de texte est préremplie avec la phrase de reprise : Claude vérifie que l'état décrit est toujours vrai, résume en 3 lignes où on en est, puis reprend aux prochaines étapes sans refaire ce qui est fait (ou te pose la question en attente si le statut est « ATTENDRE »).
+3. La conversation est vidée, et la zone de texte, si tu n'as rien commencé à y taper, est préremplie avec la phrase de reprise (sinon ton texte reste, et une notification te dit quoi demander) : Claude vérifie que l'état décrit est toujours vrai, résume en 3 lignes où on en est, puis reprend aux prochaines étapes sans refaire ce qui est fait (ou te pose la question en attente si le statut est « ATTENDRE »).
 4. Tu n'as plus qu'à appuyer sur Entrée : la nouvelle conversation repart avec tout l'essentiel, et une mémoire neuve.
 
 Pour reprendre sur un autre ordinateur, copie `relais.md` à la racine du projet là-bas.
