@@ -1,4 +1,4 @@
-import type { Animations, Autre, LigneFil, Mesure, Mesures, Niveau, ReglageRelais, Reglages } from '../types'
+import type { Animations, Autre, LigneFil, Mesure, Mesures, Niveau, Pied, ReglageRelais, Reglages } from '../types'
 import { HAUTEUR_FIL, PALETTES_JAUGE, TEXTE_APPEL, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
 import { formatPct } from './jauge'
 import { chrono } from './textes'
@@ -84,6 +84,16 @@ export function dessinerBoutons(T: Elements, boutons: readonly Bouton[], cache: 
       </Box>
     </Box>
   )
+}
+
+// Ce que la ligne des boutons sait des barres et de la jauge : assez de barres finies pour « Effacer » (une seule : sa
+// croix suffit), et le contexte une fois le seuil du relais passé.
+export function piedDe(lignes: readonly LigneFil[], autres: readonly Autre[], mesures: Mesures, seuil: number): Pied {
+  const ctx = mesures.contexte.pct
+  return {
+    effacer: lignes.filter(l => l.fini).length + autres.filter(a => a.finiLe !== null).length >= 2,
+    relais: ctx !== null && ctx >= seuil ? Math.round(ctx) : null,
+  }
 }
 
 export type EtatBande = {
@@ -231,6 +241,7 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
     jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons, s.reglages.jauge ? s.cache : null, s.expliquerCache) : null,
     jauge && s.reglage?.ouvert ? dessinerReglages(T, surface, s.reglages, s.reglage) : null,
   ].filter(r => r !== null)
+  if (rangs.length === 0) return null // sur le bureau, les boutons sont au pied de la zone de texte : rien d'autre à montrer
   if (rangs.length === 1) return rangs[0]
   return <Box flexDirection="column" gap={1}>{rangs}</Box>
 }

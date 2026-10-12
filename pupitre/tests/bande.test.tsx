@@ -77,23 +77,29 @@ test('chaque barre a sa largeur et sa hauteur fixées (sinon le bureau lui donne
   await ui.unmount()
 })
 
-test('au repos : la jauge seule sur une ligne, les boutons sur la ligne du dessous', async ($, on) => {
+test('au repos : la jauge seule sur une ligne, les boutons sur la ligne du dessous (sur le bureau, au pied de la zone de texte)', async ($, on) => {
   mock.store(on)
   mock.clock(on, { now: 1_000_000 })
   await $.command.run({ command: 'pupitre', args: '' })
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
-    const arbre = (await ui.drawn()) as unknown as { props: Record<string, unknown>; children: unknown[] }
-    expect(arbre.props.flexDirection).toBe('column')
-    expect(arbre.children).toHaveLength(2)
-    const [haut, bas] = arbre.children.map(c => JSON.stringify(c))
-    expect(haut).toContain('Contexte')
-    expect(haut).toContain('Limite 7 jours')
-    expect(haut).not.toContain('"Button"')
-    expect(bas).toContain('Réglages')
-    expect(bas).not.toContain('Contexte')
-    await ui.unmount()
-  }
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE })
+  const arbre = (await ui.drawn()) as unknown as { props: Record<string, unknown>; children: unknown[] }
+  expect(arbre.props.flexDirection).toBe('column')
+  expect(arbre.children).toHaveLength(2)
+  const [haut, bas] = arbre.children.map(c => JSON.stringify(c))
+  expect(haut).toContain('Contexte')
+  expect(haut).toContain('Limite 7 jours')
+  expect(haut).not.toContain('"Button"')
+  expect(bas).toContain('Réglages')
+  expect(bas).not.toContain('Contexte')
+  await ui.unmount()
+  const bureau = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const jauge = JSON.stringify(await bureau.drawn())
+  expect(jauge).toContain('Limite 7 jours')
+  expect(jauge).not.toContain('"Button"')
+  await bureau.unmount()
+  const pied = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...PIED })
+  expect(JSON.stringify(await pied.drawn())).toContain('Réglages')
+  await pied.unmount()
 })
 
 test('aucun texte de la jauge ne passe à la ligne', async ($, on) => {
@@ -114,7 +120,7 @@ test('jauge éteinte : il ne reste que la ligne des boutons', async ($, on) => {
   mock.clock(on, { now: 1_000_000 })
   await $.command.run({ command: 'pupitre', args: '' })
   await $.command.run({ command: 'jauge', args: '' })
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE }) // sur le bureau, les boutons sont au pied
   const arbre = JSON.stringify(await ui.drawn())
   expect(arbre).toContain('Réglages')
   expect(arbre).not.toContain('Contexte')
@@ -133,6 +139,49 @@ async function preparer($: any, on: any) {
   await $.command.run({ command: 'pupitre', args: '' })
   return horloge
 }
+
+// Sur le bureau, la ligne des boutons est au pied de la zone de texte (SessionMode) ; ailleurs, dans la bande.
+const PIED = { component: 'SessionMode', props: { modes: [] } } as const
+const CLES_PIED = new Set(['effacer', 'relais', 'plume', 'revenir', 'reglages', 'cache'])
+// La bande et, sur le bureau, la ligne des boutons, lues et pressées comme un seul dessin.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function monter($: any, surface: 'terminal' | 'desktop') {
+  const bande = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
+  const pied = surface === 'desktop' ? await $.ui.mount({ plugin: 'pupitre', surface, ...PIED }) : null
+  const tous = pied ? [bande, pied] : [bande]
+  return {
+    drawn: async () => Promise.all(tous.map(u => u.drawn())),
+    findAll: async (q: { type: string }) => (await Promise.all(tous.map(u => u.findAll(q)))).flat(),
+    find: async (q: { type: string; text?: string }) => (await Promise.all(tous.map(u => u.find(q)))).find(x => x !== undefined),
+    press: (t: { key: string }) => (pied && CLES_PIED.has(t.key) ? pied : bande).press(t),
+    unmount: async () => { for (const u of tous) await u.unmount() },
+  }
+}
+
+test('sur le bureau, les boutons sont au pied de la zone de texte : ni les barres ni la jauge ne les redessinent', async ($, on) => {
+  const ecrits: string[] = []
+  on('state.set', async ($, e, next) => { ecrits.push(String(e.key)); return next(e) })
+  await preparer($, on)
+  const bande = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const pied = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...PIED })
+  expect(await libelles(bande)).toEqual([]) // la bande ne les porte plus
+  expect(await libelles(pied)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
+  ecrits.length = 0
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Read', file_path: 'a.md' } as never)
+  expect(ecrits).toContain('lignes')
+  expect(ecrits).not.toContain('pied') // les barres changent, la ligne des boutons ne bouge pas
+  await pied.press({ key: 'reglages' })
+  expect(JSON.stringify(await bande.drawn())).toContain('Tout éteindre') // les réglages s'ouvrent dans la bande
+  await bande.unmount()
+  await pied.unmount()
+  const avecMode = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', component: 'SessionMode', props: { modes: ['focus'] } })
+  expect(JSON.stringify(await avecMode.drawn())).toContain('focus') // le mode du moteur reste, devant les boutons
+  await avecMode.unmount()
+  const terminal = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...PIED })
+  expect(JSON.stringify(await terminal.drawn())).toContain('(bande du moteur)') // au terminal, la place reste au moteur
+  await terminal.unmount()
+})
 
 test('/fil au-dessus de la jauge, les boutons en dessous', async ($, on) => {
   await preparer($, on)
@@ -271,7 +320,7 @@ test('Claude t attend : la barre passe à l orange avec « Ta réponse ? » et u
 
 const images = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) => ui.findAll({ type: 'Svg' })
 
-test('chaque image porte l heure de son dessin, puis garde le même texte tant qu elle ne change pas', async ($, on) => {
+test('chaque image porte l heure de son dessin, même inchangée : le bureau recrée toutes les images à chaque redessin', async ($, on) => {
   const horloge = await preparer($, on)
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   await horloge.advance(2_500)
@@ -280,12 +329,39 @@ test('chaque image porte l heure de son dessin, puis garde le même texte tant q
   expect(svgs.length).toBe(4)
   for (const s of svgs) expect(String(s.props.source)).toContain('--t:-1002.50s')
   await ui.unmount()
-  // une seconde plus tard, la bande est redessinée : les images, inchangées, n'ont rien à recharger, et le temps de
-  // l'étiquette a tourné tout seul dedans
+  // une seconde plus tard, la bande est redessinée : les images, inchangées, gardent leur dessin mais prennent la
+  // nouvelle heure, sinon le temps de l'étiquette repartirait de celle du premier dessin
   await horloge.advance(1_000)
   const apres = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
-  expect((await images(apres)).map(s => s.props.source)).toEqual(svgs.map(s => s.props.source))
+  const sansHeure = (s: unknown) => String(s).replace(/svg\{[^}]*\}/, '')
+  for (const s of await images(apres)) expect(String(s.props.source)).toContain('--t:-1003.50s')
+  expect((await images(apres)).map(s => sansHeure(s.props.source))).toEqual(svgs.map(s => sansHeure(s.props.source)))
   await apres.unmount()
+})
+
+// Le bureau reconstruit toute la bande à chaque redessin, boutons compris (lu dans son code le 12/10/2026) : un bouton
+// recréé sous la souris clignote, et un clic à cheval sur deux dessins se perd.
+test('pendant le travail, la bande n est pas redessinée chaque seconde sur le bureau, seulement quand le temps change une image ; au terminal, si', async ($, on) => {
+  const ecrits: string[] = [] // chaque écriture d'une valeur que la bande lit la redessine
+  on('state.set', async ($, e, next) => { ecrits.push(String(e.key)); return next(e) })
+  const { horloge } = await demarrer($, on)
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  // deux tâches, aucune faite : la barre ne bouge pas avec le temps
+  await $.tool.call({ tool: 'TodoWrite', todos: [{ content: 'a', status: 'in_progress' }, { content: 'b', status: 'pending' }] } as never)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await horloge.advance(2_000)
+  ecrits.length = 0
+  await horloge.advance(5_000)
+  expect(ecrits.filter(k => k === 'lignes' || k === 'maintenant')).toEqual([]) // rien n'a changé à l'écran : rien n'est redessiné
+  await horloge.advance(15_000) // 20 s sans changement : la barre s'assoupit
+  expect(ecrits.filter(k => k === 'lignes' || k === 'maintenant')).toEqual(['maintenant']) // un seul redessin
+  expect(JSON.stringify(await ui.drawn())).toContain('class=\\"z\\"')
+  await ui.unmount()
+  const terminal = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE })
+  ecrits.length = 0
+  await horloge.advance(3_000)
+  expect(ecrits.filter(k => k === 'maintenant')).toHaveLength(3) // au terminal, le temps est du texte : redessiné chaque seconde
+  await terminal.unmount()
 })
 
 // Sur l'application, ce qu'un mod ajoute au prompt système n'arrive pas à Claude (vu à l'essai du relais) :
@@ -294,7 +370,7 @@ test('relais : la demande part toute seule, consigne entière dans le message', 
   const envoyes: string[] = []
   on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
   const horloge = await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'relais' })
   await horloge.advance(10)
   expect(envoyes).toHaveLength(1)
@@ -308,7 +384,7 @@ test('relais : si la demande ne part pas, elle attend dans la zone de texte', as
   on('prompt.submit', async () => ({ drop: 'session occupée' }) as never)
   on('prompt.fill', async ($, e) => { remplis.push(e.text); return { isFilled: true } as never })
   const horloge = await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'relais' })
   await horloge.advance(10)
   expect(remplis).toHaveLength(1)
@@ -401,7 +477,7 @@ test('« Effacer les barres finies » : dès 2 barres finies, retire les vertes 
   await $.tool.call({ tool: 'Read', input: { file_path: 'a.md' }, agentId: 'a1' } as never)
   await $.tool.call({ tool: 'Read', input: { file_path: 'b.md' }, agentId: 'a2' } as never)
   await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', agentId: 'a1' } as never)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   expect(await libelles(ui)).not.toContain('Effacer les barres finies') // une seule barre finie : sa croix suffit
   await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', agentId: 'a2' } as never)
   expect(await libelles(ui)).toContain('Effacer les barres finies')
@@ -443,7 +519,7 @@ test('cache : la part de la dernière demande lue dans le cache, sous la jauge, 
   await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
   await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', usage: { model: 'm', input_tokens: 10, cache_read_input_tokens: 82, cache_creation_input_tokens: 8, output_tokens: 5 } } as never)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   expect(JSON.stringify(await ui.drawn())).toContain('Cache 82 %')
   await ui.press({ key: 'cache' })
   expect(toasts.some(t => t.includes('82 %') && t.includes('déjà en mémoire'))).toBe(true)
@@ -458,7 +534,7 @@ test('relais au bon moment : au-delà du seuil, le bouton affiche le contexte et
   on('session.measure', async ($, e) => ({ changed: e.changed }) as never)
   await preparer($, on)
   await $.session.measure(mesurer(55))
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   expect(await libelles(ui)).toContain('Passer le relais')
   await $.session.measure(mesurer(62))
   await $.session.measure(mesurer(64))
@@ -472,7 +548,7 @@ test('relais au bon moment : seuil réglable, et relais lancé tout seul en auto
   on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
   on('session.measure', async ($, e) => ({ changed: e.changed }) as never)
   const horloge = await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'reglages' })
   expect(JSON.stringify(await ui.drawn())).toContain('60 %')
   await ui.press({ key: 'seuil-plus' })
@@ -506,7 +582,7 @@ test('relais demandé pendant un tour : traité à la fin de son propre tour, re
     throw new Error('absent')
   })
   const horloge = await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await $.turn.start({ text: 'un long travail', turnId: 't1' } as never)
   await ui.press({ key: 'relais' })
   await horloge.advance(10)
@@ -528,7 +604,7 @@ test('relais automatique : un dépassement mesuré en plein tour lance le relais
   on('prompt.submit', async ($, e) => { envoyes.push(e.text); return { text: e.text } as never })
   on('session.measure', async ($, e) => ({ changed: e.changed }) as never)
   const horloge = await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'reglages' })
   await ui.press({ key: 'relais-auto' })
   await $.turn.start({ text: 'un long travail', turnId: 't1' } as never)
@@ -549,7 +625,7 @@ test('« Améliorer le prompt » : si tu as continué à écrire pendant l amél
   on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
   on('model.complete', async () => { boite = 'refais-les plus jolies, et vite'; return { value: { isAnswered: true, text: 'Réécrit.', usage: {} } } as never })
   await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'plume' })
   expect(boite).toBe('refais-les plus jolies, et vite')
   expect(toasts.some(t => t.includes('changé'))).toBe(true)
@@ -563,7 +639,7 @@ test('« Améliorer le prompt » : un modèle qui refuse l appel ne bloque pas l
   on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
   on('model.complete', async () => { throw new Error('modèle non autorisé') })
   await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'plume' })
   expect(toasts.some(t => t.includes('Amélioration impossible'))).toBe(true)
   expect(await libelles(ui)).toContain('Améliorer le prompt')
@@ -581,7 +657,7 @@ test('première installation : sans réglage enregistré, la bande s affiche san
   on('session.usage', async () => ({ value: { context: { window: 200_000 }, rateLimits: [] } }) as never)
   on('ui.render', async () => ({ type: 'Text', props: {}, children: ['(bande du moteur)'] }) as never)
   await $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
   await ui.unmount()
 })
@@ -607,7 +683,7 @@ test('« Améliorer le prompt » : réécrit avec la conversation, et « Revenir
   on('model.complete', async ($, e) => { demandes.push(e.prompt); return { value: { isAnswered: true, text: 'Rends les barres du fil plus jolies.', usage: {} } } as never })
   on('prompt.submit', async ($, e) => ({ text: e.text }) as never)
   const horloge = await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'plume' })
   expect(demandes[0]).toContain('Voici les barres du fil.')
   expect(boite).toBe('Rends les barres du fil plus jolies.')
@@ -624,7 +700,7 @@ const libelles = async (ui: { findAll: (q: { type: string }) => Promise<{ props:
 test('« Réglages » déplie une ligne avec un bouton par fonction, puis se replie', async ($, on) => {
   await preparer($, on)
   for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
+    const ui = await monter($, surface)
     expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
     await ui.press({ key: 'reglages' })
     const ouverts = await libelles(ui)
@@ -638,7 +714,7 @@ test('« Réglages » déplie une ligne avec un bouton par fonction, puis se rep
 
 test('un bouton de réglage éteint puis rallume sa fonction', async ($, on) => {
   await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'reglages' })
   await ui.press({ key: 'basculer-jauge' })
   expect(await libelles(ui)).toContain('○ Jauge')
@@ -654,14 +730,14 @@ test('un bouton de réglage éteint puis rallume sa fonction', async ($, on) => 
 test('« Réglages » reste accessible quand seul le fil est allumé', async ($, on) => {
   await preparer($, on)
   for (const command of ['jauge', 'relais', 'plume']) await $.command.run({ command, args: '' })
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   expect(await libelles(ui)).toEqual(['Réglages'])
   await ui.unmount()
 })
 
 test('« Tout éteindre » retire la bande', async ($, on) => {
   await preparer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   await ui.press({ key: 'reglages' })
   await ui.press({ key: 'tout' })
   expect(await ui.find({ type: 'Button', text: 'Réglages' })).toBeUndefined()
@@ -694,7 +770,7 @@ async function demarrer($: any, on: any, store: Record<string, unknown> = {}) {
 
 test('« Animations » réduites : les jauges ne tournent plus en boucle, et le choix est gardé pour la session suivante', async ($, on) => {
   const { relancer } = await demarrer($, on)
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   expect((await sources(ui)).some(s => BOUCLES.test(s))).toBe(true)
   await ui.press({ key: 'reglages' })
   expect(JSON.stringify(await ui.drawn())).toContain('Animations :')
@@ -708,7 +784,7 @@ test('« Animations » réduites : les jauges ne tournent plus en boucle, et le 
   await ui.press({ key: 'replier' })
   await ui.unmount()
   await relancer() // la session suivante relit le réglage sur le disque
-  const ensuite = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ensuite = await monter($, 'desktop')
   await ensuite.press({ key: 'reglages' })
   expect(await libelles(ensuite)).toContain('✓ Réduites')
   await ensuite.unmount()
@@ -717,7 +793,7 @@ test('« Animations » réduites : les jauges ne tournent plus en boucle, et le 
 test('« Animations » n apparaît que là où les barres sont des images, pas au terminal', async ($, on) => {
   await preparer($, on)
   for (const [surface, visible] of [['terminal', false], ['desktop', true]] as const) {
-    const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
+    const ui = await monter($, surface)
     await ui.press({ key: 'reglages' })
     expect(JSON.stringify(await ui.drawn()).includes('Animations :')).toBe(visible)
     await ui.press({ key: 'replier' })
@@ -727,7 +803,7 @@ test('« Animations » n apparaît que là où les barres sont des images, pas a
 
 test('« Animations » : coupées, enregistré avant le démarrage, s applique tout de suite', async ($, on) => {
   await demarrer($, on, { animations: 'coupees' })
-  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const ui = await monter($, 'desktop')
   for (const s of await sources(ui)) expect(s).not.toMatch(BOUCLES)
   await ui.press({ key: 'reglages' })
   expect(await libelles(ui)).toContain('✓ Coupées')

@@ -89,7 +89,8 @@ function teinte(palette: readonly string[], t: number, fini: boolean, i: number,
 // Une image qui change est rechargée et ses animations repartiraient de zéro : on les cale sur l'horloge pour
 // qu'elles reprennent où elles en étaient. --t (heure du dessin) pour les boucles, --u (temps écoulé depuis le
 // changement) pour les effets qui ne jouent qu'une fois.
-const CSS_COMMUN = (maintenant: number, majLe: number) => `svg{--t:${(-maintenant / 1000).toFixed(2)}s;--u:${((majLe - maintenant) / 1000).toFixed(2)}s}
+const ancre = (maintenant: number, majLe: number) => `svg{--t:${(-maintenant / 1000).toFixed(2)}s;--u:${((majLe - maintenant) / 1000).toFixed(2)}s}`
+const CSS_COMMUN = (maintenant: number, majLe: number) => `${ancre(maintenant, majLe)}
 .e{opacity:0;animation:etincelle 1.6s ease-in-out infinite}
 @keyframes etincelle{0%,35%,65%,100%{opacity:0}50%{opacity:.85}}
 @media (prefers-reduced-motion: reduce){.r,.e,.g,.k,.pop,.p,.a0,.a1,.a2,.a3,.a4,.a5,.h0,.h1,.h2,.h3,.h4,.h5,.v,.c,.z,${RANGS(PAS).map(i => `.w${i}`).join(',')}{animation:none}.e,.r,.g,.b0,.b1,.b2,.b3,.b4,.b5{display:none}}`
@@ -125,20 +126,21 @@ const retard = (ms: number) => `animation-delay:calc(var(--u) + ${ms}ms)`
 const RANGS = (n: number) => Array.from({ length: n }, (_, i) => i)
 export const HAUTEUR_FIL = 18 // une ligne de texte : la barre tient sur la ligne de son titre
 const ATTENTE_MS = 20_000 // rien de changé depuis ce temps (outil, étape, %) : la barre s'assoupit
-const assoupie = (o: OptionsFil) => !o.fini && !o.attente && o.maintenant - o.majLe >= ATTENTE_MS
+const assoupie = (o: { fini: boolean; attente?: boolean; maintenant: number; majLe: number }) => !o.fini && !o.attente && o.maintenant - o.majLe >= ATTENTE_MS
 
-// Le chrono redessine la bande chaque seconde : une image qui n'a pas changé rend le même texte, sans être recalculée,
-// et le bureau n'a rien à recharger. L'heure n'entre pas dans la clé : --t et --u restent ceux de son premier dessin.
-// Vérifié sur le bureau le 12/10/2026 : à texte identique, l'image n'est pas rechargée et ses animations continuent.
+// Une image qui n'a pas changé n'est pas recalculée : l'heure n'entre pas dans la clé. Mais le bureau recrée toutes les
+// images à chaque redessin de la bande (lu dans son code le 12/10/2026 : la bande entière est reconstruite puis remplacée),
+// et une image recréée repart de zéro : l'heure du dessin (--t, --u) est donc remise à chaque fois, sinon le temps de
+// l'étiquette recule à celui du premier dessin (vu à l'essai dans le navigateur intégré).
 const dessins = new Map<string, string>()
-function memoise(cle: string, dessiner: () => string): string {
+function memoise(cle: string, maintenant: number, majLe: number, dessiner: () => string): string {
   let s = dessins.get(cle)
   if (s === undefined) {
     if (dessins.size >= 32) dessins.clear() // les images affichées sont redessinées une fois, à la bonne heure
     s = dessiner()
     dessins.set(cle, s)
   }
-  return s
+  return s.replace(/svg\{--t:[^}]*\}/, ancre(maintenant, majLe))
 }
 
 // L'étiquette (le curseur) : sa largeur suit son texte ; elle se cale juste derrière le bord de la partie remplie.
@@ -161,6 +163,9 @@ const colonnesTemps = (ecoule: number): Colonne[][] => [
   ...(ecoule >= 3600 ? [[[10, 36_000]] as Colonne[]] : []), // shortcut: au-delà de 10 h les heures repartent à 0 ; rarissime
 ]
 const largeurTemps = (ecoule: number) => colonnesTemps(ecoule).reduce((l, g, i) => l + g.length * CHIFFRE + (i > 0 ? DEUX_POINTS : 0), 0)
+// Ce que le temps seul change à l'image d'une barre en cours : l'assoupissement, et une colonne de plus à 10 min puis 1 h.
+export const palier = (b: { attente?: boolean; majLe: number; debut: number }, maintenant: number) =>
+  `${assoupie({ ...b, fini: false, maintenant })}${colonnesTemps(Math.max(0, (maintenant - b.debut) / 1000)).flat().length}`
 
 function tempsQuiTourne(droite: number, depuis: number, ecoule: number): string {
   let x = droite, s = '', k = 0
@@ -272,7 +277,7 @@ export function svgFil(o: OptionsFil): string {
   const p = o.animations === 'coupees' ? { ...o, avant: o.fini ? 1 : o.progression, niveauAvant: o.niveau, eclat: false, depuis: undefined } : o
   // le temps ne change l'image qu'en ajoutant une colonne (10 min, 1 h) : sa tranche entre dans la clé, pas l'heure
   const tranche = p.depuis === undefined ? 0 : colonnesTemps(Math.max(0, (p.maintenant - p.depuis) / 1000)).flat().length
-  return memoise(JSON.stringify({ ...p, maintenant: 0, endormie: assoupie(p), tranche }), () => {
+  return memoise(JSON.stringify({ ...p, maintenant: 0, endormie: assoupie(p), tranche }), p.maintenant, p.majLe, () => {
     let s = ''
     for (const c of [3, 4, 5, 6, 8]) {
       s = dessinerFil(p, c)
@@ -311,7 +316,7 @@ function dessinerSimple(o: OptionsSimple, c: number): string {
 }
 
 export function svgSimple(o: OptionsSimple): string {
-  return memoise(JSON.stringify({ ...o, maintenant: 0 }), () => {
+  return memoise(JSON.stringify({ ...o, maintenant: 0 }), o.maintenant, o.maintenant, () => {
     let s = ''
     for (const c of [o.cellule, o.cellule + 1, o.cellule + 2, o.cellule * 3]) {
       s = dessinerSimple(o, c)

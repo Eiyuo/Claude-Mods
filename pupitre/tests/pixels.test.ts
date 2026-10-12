@@ -51,7 +51,14 @@ describe('svgFil', () => {
     expect(s).toContain('>Lecture ·<')
     expect(s.match(/class="roule(6|10)"/g)).toHaveLength(3) // M:SS
     expect(s).toContain('animation-delay:calc(var(--t) + 65.00s)')
-    expect(svgFil({ ...o, maintenant: 101_000 })).toBe(s) // une seconde plus tard : la même image, qui a tourné seule
+  })
+  test('rendue par le cache, l image porte l heure du nouveau dessin : le bureau la recrée à chaque redessin, et son temps reculerait sinon', async () => {
+    const o = { ...BASE, majLe: 100_000, maintenant: 100_000, depuis: 65_000 }
+    const sansHeure = (s: string) => s.replace(/svg\{[^}]*\}/, '')
+    const premier = svgFil(o)
+    const plusTard = svgFil({ ...o, maintenant: 110_000 })
+    expect(plusTard).toContain('svg{--t:-110.00s;--u:-10.00s}')
+    expect(sansHeure(plusTard)).toBe(sansHeure(premier)) // le reste du dessin ne change pas
   })
   test('à 10 min et à 1 h, une colonne de plus (l image est redessinée à ce moment-là)', async () => {
     const colonnes = (ecoule: number) => svgFil({ ...BASE, majLe: 0, maintenant: ecoule * 1000, depuis: 0, avant: 0.3 }).match(/class="roule(6|10)"/g)!.length
@@ -71,10 +78,12 @@ describe('svgFil', () => {
   test('le même état donne exactement le même SVG (aucun recalcul inutile)', async () => {
     expect(svgFil(BASE)).toBe(svgFil(BASE))
   })
-  test('d une seconde à l autre, une image inchangée garde le même texte : le bureau n a rien à recharger', async () => {
-    expect(svgFil({ ...BASE, majLe: 7000, maintenant: 8000 })).toBe(svgFil({ ...BASE, majLe: 7000, maintenant: 9000 }))
+  test('d une seconde à l autre, une image inchangée garde le même dessin, à la nouvelle heure', async () => {
+    const sansHeure = (s: string) => s.replace(/svg\{[^}]*\}/, '')
+    expect(sansHeure(svgFil({ ...BASE, majLe: 7000, maintenant: 8000 }))).toBe(sansHeure(svgFil({ ...BASE, majLe: 7000, maintenant: 9000 })))
     const jauge = { largeur: 160, hauteur: 10, cellule: 2, rayon: 4, progression: 0.3, palette: PALETTES_FIL[1]!, graine: 2, maintenant: 8000 }
-    expect(svgSimple({ ...jauge, maintenant: 9000 })).toBe(svgSimple(jauge))
+    expect(svgSimple({ ...jauge, maintenant: 9000 })).toContain('svg{--t:-9.00s;--u:0.00s}')
+    expect(sansHeure(svgSimple({ ...jauge, maintenant: 9000 }))).toBe(sansHeure(svgSimple(jauge)))
   })
   test('reste sous 125 000 caractères même très large, avec fondu et éclat', async () => {
     for (const largeur of [300, 900, 1600, 2600]) {
