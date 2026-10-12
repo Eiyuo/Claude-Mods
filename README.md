@@ -209,15 +209,3 @@ Tout reste sur ton PC :
 - `relais.md`.
 
 Seule exception : l'amélioration de /plume, qui passe par Claude comme le reste de la conversation.
-
----
-
-## Pour Claude (développement)
-
-- Conception : `docs/specs/2026-10-11-pupitre-design.md`.
-- Pendant le développement, le mod se charge à chaud depuis le dossier des mods de la session.
-- Vérifications :
-  - `claude plugin validate pupitre` ;
-  - `claude plugin test pupitre` ;
-  - contrôle des types avec `tsc`.
-- Identité des commits : `Eiyuo <203855181+Eiyuo@users.noreply.github.com>`. Ne jamais écrire d'identifiant d'entreprise ni de nom réel dans ce dépôt.
