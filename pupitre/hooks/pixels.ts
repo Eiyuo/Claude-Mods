@@ -122,6 +122,7 @@ const assoupie = (o: OptionsFil) => !o.fini && o.maintenant - o.majLe >= ATTENTE
 
 // Le chrono redessine la bande chaque seconde : une image qui n'a pas changé rend le même texte, sans être recalculée,
 // et le bureau n'a rien à recharger. L'heure n'entre pas dans la clé : --t et --u restent ceux de son premier dessin.
+// Vérifié sur le bureau le 12/10/2026 : à texte identique, l'image n'est pas rechargée et ses animations continuent.
 const dessins = new Map<string, string>()
 function memoise(cle: string, dessiner: () => string): string {
   let s = dessins.get(cle)

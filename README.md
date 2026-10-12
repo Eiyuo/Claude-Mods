@@ -33,6 +33,18 @@ La bande s'affiche au-dessus de la zone de texte. On y trouve la jauge (mémoire
 
 À faire **une fois par ordinateur**. Il te faut Claude Code à jour et la commande `claude` dans un terminal (PowerShell sous Windows) : ces commandes ne se tapent pas dans l'onglet Code de l'application.
 
+**Si Windows répond que `claude` n'est pas reconnu.** L'application de bureau a sa propre copie de Claude Code, mais Windows ne la connaît pas sous ce nom. Dans PowerShell, colle d'abord cette ligne, qui la retrouve :
+
+```powershell
+$claude = (Get-ChildItem "$env:APPDATA\Claude\claude-code" -Filter claude.exe -Recurse | Sort-Object LastWriteTime -Descending)[0].FullName
+```
+
+Puis, dans la même fenêtre, écris `& $claude` à la place de `claude` au début de chaque commande de cette page, par exemple :
+
+```powershell
+& $claude plugin update pupitre@claude-mods
+```
+
 1. Ajoute le catalogue de mods :
    ```
    claude plugin marketplace add Eiyuo/Claude-Mods
