@@ -11,7 +11,6 @@ export type LigneFil = {
 export type ReglageRelais = { seuil: number; auto: boolean } // seuil du contexte, en %, de 30 à 90
 export type Animations = 'completes' | 'reduites' | 'coupees' // réduites : sans boucles ; coupées : images fixes
 export type Plume = { original: string | null; enCours: boolean } // original : ton texte d'avant, jusqu'à l'envoi
-export type Pied = { effacer: boolean; relais: number | null } // ligne des boutons du bureau : « Effacer » à montrer ? contexte sur « Passer le relais »
 export type Autre = { id: string; titre: string; tache: string; compteur: string; progression: number; niveau: Niveau; debut: number; majLe: number; finiLe: number | null; demande: string; mot: string; attente: boolean }
 
 declare module 'claude-code' {
@@ -28,7 +27,6 @@ declare module 'claude-code' {
       relais: ReglageRelais
       cache: number | null
       animations: Animations
-      pied: Pied
     }
   }
 }

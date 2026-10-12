@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.7) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.8) |
 
 ## Aperçu
 
@@ -120,7 +120,7 @@ Le symbole **↻** donne le temps avant la remise à zéro. Chaque texte tient s
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 
-Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ». À gauche, le cache (par exemple « Cache 99 % ⓘ ») : un clic dessus l'explique en une phrase. Sur l'application de bureau, cette ligne est au pied de la zone de texte, en petites pastilles : à part de la bande, elle n'est plus redessinée par les barres, et un clic ne la fait plus clignoter.
+Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ». À gauche, le cache (par exemple « Cache 99 % ⓘ ») : un clic dessus l'explique en une phrase. Sur l'application de bureau, « ⇄ Relais », « Améliorer » (« Retour » après une amélioration) et « ⚙ » (les réglages) sont dans la barre du bas de la zone de texte, à côté du modèle : à part de la bande, ils ne sont plus redessinés par les barres, et un clic ne les fait plus clignoter. Le cache et « Effacer les barres finies » restent dans la bande.
 
 **Le cache.** À chaque réponse, Claude ne se souvient de rien tout seul : toute la conversation lui est renvoyée (ses consignes, les messages précédents, les fichiers lus). Pour ne pas tout retraiter à chaque fois, Anthropic garde un moment en mémoire le début de la conversation qui n'a pas changé : c'est le cache. Le pourcentage donne la part de ta dernière demande qui venait de ce cache.
 - **Un chiffre haut (souvent 99 %) est le bon cas** : d'un message à l'autre, seuls ton nouveau message et les derniers résultats sont nouveaux. Les réponses sont plus rapides, et la partie relue depuis le cache coûte beaucoup moins cher.

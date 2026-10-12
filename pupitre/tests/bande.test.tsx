@@ -98,7 +98,7 @@ test('au repos : la jauge seule sur une ligne, les boutons sur la ligne du desso
   expect(jauge).not.toContain('"Button"')
   await bureau.unmount()
   const pied = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...PIED })
-  expect(JSON.stringify(await pied.drawn())).toContain('Réglages')
+  expect(JSON.stringify(await pied.drawn())).toContain('⚙')
   await pied.unmount()
 })
 
@@ -142,7 +142,7 @@ async function preparer($: any, on: any) {
 
 // Sur le bureau, la ligne des boutons est au pied de la zone de texte (SessionMode) ; ailleurs, dans la bande.
 const PIED = { component: 'SessionMode', props: { modes: [] } } as const
-const CLES_PIED = new Set(['effacer', 'relais', 'plume', 'revenir', 'reglages', 'cache'])
+const CLES_PIED = new Set(['relais', 'plume', 'revenir', 'reglages'])
 // La bande et, sur le bureau, la ligne des boutons, lues et pressées comme un seul dessin.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function monter($: any, surface: 'terminal' | 'desktop') {
@@ -158,19 +158,13 @@ async function monter($: any, surface: 'terminal' | 'desktop') {
   }
 }
 
-test('sur le bureau, les boutons sont au pied de la zone de texte : ni les barres ni la jauge ne les redessinent', async ($, on) => {
-  const ecrits: string[] = []
-  on('state.set', async ($, e, next) => { ecrits.push(String(e.key)); return next(e) })
+test('sur le bureau, relais, plume et Réglages sont dans la barre du bas, en mots courts (24 caractères de large au plus)', async ($, on) => {
   await preparer($, on)
   const bande = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   const pied = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...PIED })
   expect(await libelles(bande)).toEqual([]) // la bande ne les porte plus
-  expect(await libelles(pied)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
-  ecrits.length = 0
-  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
-  await $.tool.call({ tool: 'Read', file_path: 'a.md' } as never)
-  expect(ecrits).toContain('lignes')
-  expect(ecrits).not.toContain('pied') // les barres changent, la ligne des boutons ne bouge pas
+  expect(await libelles(pied)).toEqual(['⇄ Relais', 'Améliorer', '⚙'])
+  expect((await libelles(pied)).join('').length).toBeLessThanOrEqual(19) // avec le tour de chaque pastille, tient dans 24
   await pied.press({ key: 'reglages' })
   expect(JSON.stringify(await bande.drawn())).toContain('Tout éteindre') // les réglages s'ouvrent dans la bande
   await bande.unmount()
@@ -230,6 +224,8 @@ test('travail fini : la barre passe au vert avec une croix « Fermer », qui la 
 test('autre discussion finie : sa ligne reste quelques secondes avec sa croix, même l autre discussion fermée, puis s efface', async ($, on) => {
   let fiche = ''
   let ecriteLe = 0
+  const ecrits: string[] = []
+  on('state.set', async ($, e, next) => { ecrits.push(String(e.key)); return next(e) })
   mock.env(on, { USERPROFILE: 'C:/Users/essai' })
   on('fs.write', async () => ({ value: undefined }) as never)
   on('fs.list', async () => ({ value: fiche ? [{ name: 'autre.json', mtimeMs: ecriteLe }] : [] }) as never)
@@ -252,6 +248,13 @@ test('autre discussion finie : sa ligne reste quelques secondes avec sa croix, m
   expect(enCours).toContain('Autres discussions') // le titre, au-dessus des autres conversations
   expect(enCours).toContain('"⧉"') // et leur icône de fenêtre
   expect(await croix()).toHaveLength(0) // pas pendant le travail
+  ecrits.length = 0
+  poser(L) // son signe de vie : la même fiche, réécrite à une autre heure
+  await horloge.advance(2_000)
+  expect(ecrits).not.toContain('autres') // rien n'a changé à l'écran : la bande n'est pas redessinée
+  poser({ ...L, mot: 'Écriture' })
+  await horloge.advance(2_000)
+  expect(ecrits).toContain('autres')
   const finir = () => poser({ ...L, fini: true, finiLe: horloge.now(), tache: 'Terminé', compteur: '✓', mot: '✓ Fini', progression: 1, niveau: 3 })
   finir()
   await horloge.advance(2_000)
@@ -362,6 +365,9 @@ test('pendant le travail, la bande n est pas redessinée chaque seconde sur le b
   await horloge.advance(3_000)
   expect(ecrits.filter(k => k === 'maintenant')).toHaveLength(3) // au terminal, le temps est du texte : redessiné chaque seconde
   await terminal.unmount()
+  ecrits.length = 0
+  await horloge.advance(30_000)
+  expect(ecrits).not.toContain('mesures') // la jauge relue toutes les 30 s, inchangée : pas réécrite
 })
 
 // Sur l'application, ce qu'un mod ajoute au prompt système n'arrive pas à Claude (vu à l'essai du relais) :
@@ -534,7 +540,7 @@ test('relais au bon moment : au-delà du seuil, le bouton affiche le contexte et
   on('session.measure', async ($, e) => ({ changed: e.changed }) as never)
   await preparer($, on)
   await $.session.measure(mesurer(55))
-  const ui = await monter($, 'desktop')
+  const ui = await monter($, 'terminal') // sur le bureau, la barre du bas dit « Relais », sans le contexte
   expect(await libelles(ui)).toContain('Passer le relais')
   await $.session.measure(mesurer(62))
   await $.session.measure(mesurer(64))
@@ -629,7 +635,7 @@ test('« Améliorer le prompt » : si tu as continué à écrire pendant l amél
   await ui.press({ key: 'plume' })
   expect(boite).toBe('refais-les plus jolies, et vite')
   expect(toasts.some(t => t.includes('changé'))).toBe(true)
-  expect(await libelles(ui)).toContain('Améliorer le prompt')
+  expect(await libelles(ui)).toContain('Améliorer')
   await ui.unmount()
 })
 
@@ -642,7 +648,7 @@ test('« Améliorer le prompt » : un modèle qui refuse l appel ne bloque pas l
   const ui = await monter($, 'desktop')
   await ui.press({ key: 'plume' })
   expect(toasts.some(t => t.includes('Amélioration impossible'))).toBe(true)
-  expect(await libelles(ui)).toContain('Améliorer le prompt')
+  expect(await libelles(ui)).toContain('Améliorer')
   await ui.unmount()
 })
 
@@ -658,7 +664,7 @@ test('première installation : sans réglage enregistré, la bande s affiche san
   on('ui.render', async () => ({ type: 'Text', props: {}, children: ['(bande du moteur)'] }) as never)
   await $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
   const ui = await monter($, 'desktop')
-  expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
+  expect(await libelles(ui)).toEqual(['⇄ Relais', 'Améliorer', '⚙'])
   await ui.unmount()
 })
 
@@ -688,9 +694,9 @@ test('« Améliorer le prompt » : réécrit avec la conversation, et « Revenir
   expect(demandes[0]).toContain('Voici les barres du fil.')
   expect(boite).toBe('Rends les barres du fil plus jolies.')
   await horloge.advance(120_000) // le temps de relire : le retour reste possible
-  expect(await libelles(ui)).toContain('Revenir à mon texte')
+  expect(await libelles(ui)).toContain('Retour')
   await $.prompt.submit({ text: boite })
-  expect(await libelles(ui)).toContain('Améliorer le prompt')
+  expect(await libelles(ui)).toContain('Améliorer')
   await ui.unmount()
 })
 
@@ -701,13 +707,14 @@ test('« Réglages » déplie une ligne avec un bouton par fonction, puis se rep
   await preparer($, on)
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await monter($, surface)
-    expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
+    const fermes = surface === 'desktop' ? ['⇄ Relais', 'Améliorer', '⚙'] : ['Passer le relais', 'Améliorer le prompt', 'Réglages']
+    expect(await libelles(ui)).toEqual(fermes)
     await ui.press({ key: 'reglages' })
     const ouverts = await libelles(ui)
     for (const l of ['✓ Jauge', '✓ Fil', '✓ Relais', '✓ Plume', '✓ Cap', 'Tout éteindre', 'Replier', '−', '+', '○ Automatique']) expect(ouverts).toContain(l)
     expect(JSON.stringify(await ui.drawn())).toContain('Relais à :')
     await ui.press({ key: 'replier' })
-    expect(await libelles(ui)).toEqual(['Passer le relais', 'Améliorer le prompt', 'Réglages'])
+    expect(await libelles(ui)).toEqual(fermes)
     await ui.unmount()
   }
 })
@@ -721,7 +728,7 @@ test('un bouton de réglage éteint puis rallume sa fonction', async ($, on) => 
   expect(await libelles(ui)).toContain('Tout allumer')
   expect(JSON.stringify(await ui.drawn())).not.toContain('Contexte')
   await ui.press({ key: 'basculer-relais' })
-  expect(await libelles(ui)).not.toContain('Passer le relais')
+  expect(await libelles(ui)).not.toContain('⇄ Relais')
   await ui.press({ key: 'basculer-jauge' })
   expect(JSON.stringify(await ui.drawn())).toContain('Contexte')
   await ui.unmount()
@@ -731,7 +738,7 @@ test('« Réglages » reste accessible quand seul le fil est allumé', async ($,
   await preparer($, on)
   for (const command of ['jauge', 'relais', 'plume']) await $.command.run({ command, args: '' })
   const ui = await monter($, 'desktop')
-  expect(await libelles(ui)).toEqual(['Réglages'])
+  expect(await libelles(ui)).toEqual(['⚙']) // sur le bureau, la roue de la barre du bas
   await ui.unmount()
 })
 
@@ -740,7 +747,7 @@ test('« Tout éteindre » retire la bande', async ($, on) => {
   const ui = await monter($, 'desktop')
   await ui.press({ key: 'reglages' })
   await ui.press({ key: 'tout' })
-  expect(await ui.find({ type: 'Button', text: 'Réglages' })).toBeUndefined()
+  expect(await ui.find({ type: 'Button', key: 'reglages' })).toBeUndefined()
   await ui.unmount()
 })
 

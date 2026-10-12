@@ -1,10 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Animations, Autre, LigneFil, Mesures, Pied, Plume, ReglageRelais, Reglages } from '../types'
+import type { Animations, Autre, LigneFil, Mesures, Plume, ReglageRelais, Reglages } from '../types'
 import { AUCUN, basculer, changerSeuil, jaugeVisible, lireAnimations, lireRelais, lireReglages, type Commande } from './reglages'
 import { MESURES_VIDES, lireMesures, pourcentageCache, type UsageLu } from './jauge'
-import { dessinerBande, dessinerBoutons, piedDe, type Bouton, type Elements } from './bande'
+import { dessinerBande, dessinerBoutons, piedDe, type Bouton, type Elements, type Pied } from './bande'
 import { appliquerAppel, debutTour, encoreVisible, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
 import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, explicationCache, messageHumain, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
@@ -24,7 +24,6 @@ export const chargeA = atom({ plugin: 'pupitre', key: 'charge' } as const, false
 export const relaisA = atom({ plugin: 'pupitre', key: 'relais' } as const, lireRelais(undefined) as ReglageRelais)
 export const cacheA = atom({ plugin: 'pupitre', key: 'cache' } as const, null as number | null)
 export const animationsA = atom({ plugin: 'pupitre', key: 'animations' } as const, 'completes' as Animations)
-export const piedA = atom({ plugin: 'pupitre', key: 'pied' } as const, { effacer: false, relais: null } as Pied)
 
 let derniereUsage: UsageLu | null = null
 
@@ -60,25 +59,19 @@ async function majLignes($: Dollar): Promise<void> {
   }
   // le bureau reconstruit toute la bande à chaque écriture, boutons compris : rien n'est écrit quand rien n'a changé
   if (JSON.stringify(lignes) !== JSON.stringify(avant)) await update($, lignesA, () => lignes)
-  await majPied($)
 }
 
-// La ligne des boutons du bureau ne lit que ceci, écrit seulement quand ça change : ni les barres ni la jauge ne la redessinent.
-async function majPied($: Dollar): Promise<void> {
-  const p = piedDe(await read($, lignesA), await read($, autresA), await read($, mesuresA), (await read($, relaisA)).seuil)
-  if (JSON.stringify(p) !== JSON.stringify(await read($, piedA))) await update($, piedA, () => p)
-}
-
-async function boutonsDe($: Dollar, r: Reglages, pied: Pied): Promise<Bouton[]> {
+// court : la barre du bas du bureau, large de 24 caractères au plus (lu dans son code) : des mots courts, sans « Effacer »
+async function boutonsDe($: Dollar, r: Reglages, pied: Pied, court = false): Promise<Bouton[]> {
   const boutons: Bouton[] = []
-  if (r.fil && pied.effacer) boutons.push({ cle: 'effacer', libelle: 'Effacer les barres finies', action: () => { void effacerFinies($) } })
-  if (r.relais) boutons.push({ cle: 'relais', libelle: pied.relais !== null ? `Passer le relais · ${pied.relais} %` : 'Passer le relais', action: () => { void lancerRelais($) } })
+  if (!court && r.fil && pied.effacer) boutons.push({ cle: 'effacer', libelle: 'Effacer les barres finies', action: () => { void effacerFinies($) } })
+  if (r.relais) boutons.push({ cle: 'relais', libelle: court ? '⇄ Relais' : pied.relais !== null ? `Passer le relais · ${pied.relais} %` : 'Passer le relais', action: () => { void lancerRelais($) } })
   const plume = await read($, plumeA)
   if (r.plume) {
-    if (plume.original !== null) boutons.push({ cle: 'revenir', libelle: 'Revenir à mon texte', action: () => { void revenir($) } })
-    else boutons.push({ cle: 'plume', libelle: plume.enCours ? 'Amélioration…' : 'Améliorer le prompt', action: () => { void ameliorer($) } })
+    if (plume.original !== null) boutons.push({ cle: 'revenir', libelle: court ? 'Retour' : 'Revenir à mon texte', action: () => { void revenir($) } })
+    else boutons.push({ cle: 'plume', libelle: plume.enCours ? (court ? 'Améliorer…' : 'Amélioration…') : (court ? 'Améliorer' : 'Améliorer le prompt'), action: () => { void ameliorer($) } })
   }
-  boutons.push({ cle: 'reglages', libelle: 'Réglages', action: () => { void update($, ouvertA, o => !o) } })
+  boutons.push({ cle: 'reglages', libelle: court ? '⚙' : 'Réglages', action: () => { void update($, ouvertA, o => !o) } })
   return boutons
 }
 
@@ -126,7 +119,6 @@ async function reglerRelais($: Dollar, f: (r: ReglageRelais) => ReglageRelais): 
   await update($, relaisA, () => r)
   await $.store.set('relais', r)
   seuilPasse = false
-  await majPied($)
 }
 
 async function choisirAnimations($: Dollar, a: Animations): Promise<void> {
@@ -205,7 +197,6 @@ async function effacerFinies($: Dollar): Promise<void> {
   for (const [k, s] of suivis) if (s.fin !== null) suivis.delete(k)
   await majLignes($)
   await update($, autresA, l => l.filter(a => a.finiLe === null))
-  await majPied($)
 }
 
 // Une barre finie s'efface toute seule 5 s après être passée au vert, comme si on avait cliqué sa croix ;
@@ -278,8 +269,9 @@ export const register: Register = on => {
     $.clock.every(30_000, () => {
       void (async () => {
         if (!derniereUsage) return
-        const maintenant = await $.clock.now()
-        await update($, mesuresA, () => lireMesures(derniereUsage!, maintenant))
+        const m = lireMesures(derniereUsage, await $.clock.now())
+        // le bureau reconstruit toute la bande à chaque écriture : rien n'est écrit quand rien n'a changé
+        if (JSON.stringify(m) !== JSON.stringify(await read($, mesuresA))) await update($, mesuresA, () => m)
       })()
     })
     $.clock.every(1000, () => {
@@ -298,7 +290,6 @@ export const register: Register = on => {
         const enCours = [...(await read($, lignesA)).filter(l => !l.fini), ...(await read($, autresA)).filter(a => a.finiLe === null)]
         const p = enCours.map(b => palier(b, maintenant)).join()
         if (enCours.length > 0 && (enTexte || p !== dernierPalier)) { dernierPalier = p; await update($, maintenantA, () => maintenant) }
-        await majPied($) // les autres fenêtres et la jauge changent aussi hors des barres d'ici
       })()
     })
 
@@ -328,7 +319,11 @@ export const register: Register = on => {
         }
         const suivre = (avant: readonly Autre[]) => suivreAutres(avant, fiches, moi, maintenant)
         const avant = await read($, autresA)
-        if (JSON.stringify(avant) !== JSON.stringify(suivre(avant))) await update($, autresA, suivre)
+        // Le signe de vie d'une autre fenêtre (sa fiche réécrite toutes les 6 s) ne change que l'heure de la fiche : la
+        // bande, que le bureau reconstruit en entier, n'est redessinée que pour un vrai changement. Sa barre garde ainsi
+        // l'heure de son dernier changement, et s'assoupit après 20 s sans rien, comme celle d'ici.
+        const sansHeure = (l: readonly Autre[]) => JSON.stringify(l.map(a => ({ ...a, majLe: 0 })))
+        if (sansHeure(avant) !== sansHeure(suivre(avant))) await update($, autresA, suivre)
       })()
     })
     return next(e)
@@ -457,7 +452,6 @@ export const register: Register = on => {
     derniereUsage = { context: e.context, rateLimits: e.rateLimits }
     const maintenant = await $.clock.now()
     await update($, mesuresA, () => lireMesures(derniereUsage!, maintenant))
-    await majPied($)
     await surveillerRelais($)
     return next(e)
   })
@@ -471,8 +465,9 @@ export const register: Register = on => {
     const autres = await read($, autresA)
     const mesures = await read($, mesuresA)
     const relais = await read($, relaisA)
-    // sur le bureau, la ligne des boutons est au pied de la zone de texte (voir SessionMode)
-    const boutons = e.surface === 'desktop' ? [] : await boutonsDe($, r, piedDe(lignes, autres, mesures, relais.seuil))
+    // sur le bureau, relais, plume et Réglages sont dans la barre du bas (voir SessionMode) : « Effacer » et le cache restent ici
+    const tous = await boutonsDe($, r, piedDe(lignes, autres, mesures, relais.seuil))
+    const boutons = e.surface === 'desktop' ? tous.filter(b => b.cle === 'effacer') : tous
     await read($, maintenantA) // abonne la bande au tic (voir le tic d'une seconde) ; les images, elles, veulent l'heure exacte du dessin
     const maintenant = await $.clock.now()
     const cache = await read($, cacheA)
@@ -503,17 +498,17 @@ export const register: Register = on => {
     return arbre === null ? next(e) : (arbre as never)
   })
 
-  // Sur le bureau, la ligne des boutons est au pied de la zone de texte (demande du 12/10/2026), là où il met les modes
-  // (« focus »), en petites pastilles (vu dans son code). Le bureau reconstruit la bande en entier à chaque redessin : à
-  // part, et sans lire les barres ni la jauge (piedA), les boutons ne sont plus refaits par elles, et le clic tient.
-  // Au terminal, cette place est celle des modes du moteur : les boutons restent dans la bande.
+  // Sur le bureau, relais, plume et Réglages sont dans la barre du bas de la zone de texte (demande du 12/10/2026), là où
+  // il met les modes (« focus ») : en petites pastilles, 24 caractères de large au plus (vu dans son code, puis sur capture :
+  // les libellés entiers étaient coupés après le premier), d'où les mots courts. Le bureau reconstruit la bande en entier à
+  // chaque redessin : à part, et sans lire les barres ni la jauge, ces boutons ne sont plus refaits par elles, et le clic
+  // tient. Au terminal, cette place est celle des modes du moteur : les boutons restent dans la bande.
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     if (e.surface !== 'desktop') return next(e)
     const r = await read($, reglagesA)
     if (!jaugeVisible(r)) return next(e)
     const T = $.ui.resolve(e) as unknown as Elements
-    const cache = r.jauge ? await read($, cacheA) : null
-    const ligne = dessinerBoutons(T, await boutonsDe($, r, await read($, piedA)), cache, () => { if (cache !== null) $.ui.toast(explicationCache(cache)) })
+    const ligne = dessinerBoutons(T, await boutonsDe($, r, { effacer: false, relais: null }, true), null)
     if (e.props.modes.length === 0) return ligne as never
     const { Box, Text } = T
     return (<Box flexDirection="row" gap={1}><Text dimColor wrap="truncate">{e.props.modes.join(' & ')}</Text>{ligne}</Box>) as never
