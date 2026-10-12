@@ -1,4 +1,4 @@
-import type { Autre, LigneFil, Mesure, Mesures, Niveau, ReglageRelais, Reglages } from '../types'
+import type { Animations, Autre, LigneFil, Mesure, Mesures, Niveau, ReglageRelais, Reglages } from '../types'
 import { HAUTEUR_FIL, PALETTES_JAUGE, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
 import { formatPct } from './jauge'
 import { chrono } from './textes'
@@ -39,7 +39,7 @@ export function dispositionJauge(colonnes: number, morceaux: readonly Morceau[],
   return { barre: Math.max(BARRE_MIN, Math.min(BARRE_MAX, barre(false, true))), avecCourt: false, abrege: true }
 }
 
-function mesure(T: Elements, surface: string, nom: string, affiche: string, m: Mesure, barre: number, avecCourt: boolean, maintenant: number) {
+function mesure(T: Elements, surface: string, nom: string, affiche: string, m: Mesure, barre: number, avecCourt: boolean, maintenant: number, animations: Animations) {
   const { Box, Text, Svg } = T
   const pct = m.pct ?? 0
   const titre = `${nom} : ${m.detail}`
@@ -47,7 +47,7 @@ function mesure(T: Elements, surface: string, nom: string, affiche: string, m: M
   const court = avecCourt ? (m.court ?? '') : ''
   const dessin = surface === 'terminal' || Svg === undefined
     ? <Text dimColor wrap="truncate">{barreTexte(pct / 100, barre)}</Text>
-    : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], alerte: couleurJauge(pct) === 'rouge', graine: graineDe(nom), maintenant, titre })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} />
+    : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], alerte: couleurJauge(pct) === 'rouge', graine: graineDe(nom), maintenant, titre, animations })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} />
   return (
     <Box key={nom} flexDirection="row" alignItems="center" gap={1}>
       <Text dimColor wrap="truncate">{affiche}</Text>
@@ -59,14 +59,14 @@ function mesure(T: Elements, surface: string, nom: string, affiche: string, m: M
 }
 
 // La ligne de la jauge : les trois mesures seules, réparties sur toute la largeur.
-export function dessinerJauge(T: Elements, surface: string, colonnes: number, mesures: Mesures, maintenant: number) {
+export function dessinerJauge(T: Elements, surface: string, colonnes: number, mesures: Mesures, maintenant: number, animations: Animations) {
   const { Box } = T
   const parCar = surface === 'terminal' ? 1 : PAR_CAR_BUREAU
   const liste: [string, string, Mesure][] = [['Contexte', 'Contexte', mesures.contexte], ['Limite 5 h', '5 h', mesures.cinqH], ['Limite 7 jours', '7 jours', mesures.septJ]]
   const { barre, avecCourt, abrege } = dispositionJauge(colonnes, liste.map(([nom, court, m]) => ({ nom, abrege: court, pct: formatPct(m.pct), court: m.court ?? '' })), 0, parCar)
   return (
     <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={ECART}>
-      {liste.map(([nom, court, m]) => mesure(T, surface, nom, abrege ? court : nom, m, barre, avecCourt, maintenant))}
+      {liste.map(([nom, court, m]) => mesure(T, surface, nom, abrege ? court : nom, m, barre, avecCourt, maintenant, animations))}
     </Box>
   )
 }
@@ -89,6 +89,7 @@ export function dessinerBoutons(T: Elements, boutons: readonly Bouton[], cache: 
 export type EtatBande = {
   reglages: Reglages; mesures: Mesures; lignes: readonly LigneFil[]; autres: readonly Autre[]
   maintenant: number // heure du dessin : chronos, et animations des images (voir pixels.ts)
+  animations: Animations // réglage « Animations » : complètes, réduites ou coupées
   boutons: readonly Bouton[]
   cache: number | null // part de la dernière demande lue dans le cache, en %
   expliquerCache?: () => void // clic sur le cache : une notification l'explique
@@ -100,30 +101,37 @@ export type EtatBande = {
 export type ActionsReglage = {
   ouvert: boolean; basculer: (c: Commande) => void; replier: () => void
   relais: ReglageRelais; seuil: (sens: -1 | 1) => void; auto: () => void
+  animations: Animations; choisirAnimations: (a: Animations) => void
 }
 const FONCTIONS: readonly [Exclude<Commande, 'pupitre'>, string][] = [['jauge', 'Jauge'], ['fil', 'Fil'], ['relais', 'Relais'], ['plume', 'Plume'], ['cap', 'Cap']]
+const ANIMATIONS: readonly [Animations, string][] = [['completes', 'Complètes'], ['reduites', 'Réduites'], ['coupees', 'Coupées']]
 
-export function dessinerReglages(T: Elements, r: Reglages, a: ActionsReglage) {
-  const { Box, Text, Button } = T
-  const fonctions = (
-    <Box flexDirection="row" alignItems="center" gap={1}>
-      <Text dimColor wrap="truncate">Pupitre :</Text>
-      {FONCTIONS.map(([c, nom]) => <Button key={`basculer-${c}`} label={`${r[c] ? '✓' : '○'} ${nom}`} onPress={() => a.basculer(c)} />)}
-      <Button key="tout" label={toutAllume(r) ? 'Tout éteindre' : 'Tout allumer'} onPress={() => a.basculer('pupitre')} />
-      <Button key="replier" label="Replier" onPress={() => a.replier()} />
-    </Box>
-  )
-  if (!r.relais) return fonctions
+export function dessinerReglages(T: Elements, surface: string, r: Reglages, a: ActionsReglage) {
+  const { Box, Text, Button, Svg } = T
+  const images = surface !== 'terminal' && Svg !== undefined // ailleurs, les barres sont en caractères, sans animation
   return (
     <Box flexDirection="column" gap={1}>
-      {fonctions}
       <Box flexDirection="row" alignItems="center" gap={1}>
-        <Text dimColor wrap="truncate">Relais à :</Text>
-        <Button key="seuil-moins" label="−" onPress={() => a.seuil(-1)} />
-        <Text wrap="truncate">{`${a.relais.seuil} %`}</Text>
-        <Button key="seuil-plus" label="+" onPress={() => a.seuil(1)} />
-        <Button key="relais-auto" label={`${a.relais.auto ? '✓' : '○'} Automatique`} onPress={() => a.auto()} />
+        <Text dimColor wrap="truncate">Pupitre :</Text>
+        {FONCTIONS.map(([c, nom]) => <Button key={`basculer-${c}`} label={`${r[c] ? '✓' : '○'} ${nom}`} onPress={() => a.basculer(c)} />)}
+        <Button key="tout" label={toutAllume(r) ? 'Tout éteindre' : 'Tout allumer'} onPress={() => a.basculer('pupitre')} />
+        <Button key="replier" label="Replier" onPress={() => a.replier()} />
       </Box>
+      {r.relais ? (
+        <Box flexDirection="row" alignItems="center" gap={1}>
+          <Text dimColor wrap="truncate">Relais à :</Text>
+          <Button key="seuil-moins" label="−" onPress={() => a.seuil(-1)} />
+          <Text wrap="truncate">{`${a.relais.seuil} %`}</Text>
+          <Button key="seuil-plus" label="+" onPress={() => a.seuil(1)} />
+          <Button key="relais-auto" label={`${a.relais.auto ? '✓' : '○'} Automatique`} onPress={() => a.auto()} />
+        </Box>
+      ) : null}
+      {images ? (
+        <Box flexDirection="row" alignItems="center" gap={1}>
+          <Text dimColor wrap="truncate">Animations :</Text>
+          {ANIMATIONS.map(([v, nom]) => <Button key={`animations-${v}`} label={`${a.animations === v ? '✓' : '○'} ${nom}`} onPress={() => a.choisirAnimations(v)} />)}
+        </Box>
+      ) : null}
     </Box>
   )
 }
@@ -144,14 +152,14 @@ type Rang = {
   fermer?: { cle: string; action: () => void }
 }
 
-function rang(T: Elements, surface: string, colonnes: number, r: Rang, maintenant: number) {
+function rang(T: Elements, surface: string, colonnes: number, r: Rang, maintenant: number, animations: Animations) {
   const { Box, Text, Svg, Button } = T
   const largeur = largeurBarre(colonnes)
   const w = Math.max(40, Math.round(largeur * PX_COL))
   const pct = `${Math.round((r.fini ? 1 : r.progression) * 100)} %`
   const barre = surface === 'terminal' || Svg === undefined
     ? <Text color={TEXTE_NIVEAU[r.niveau]} wrap="truncate">{barreTexte(r.fini ? 1 : r.progression, Math.max(1, largeur - r.mot.length - 1))} {r.mot}</Text>
-    : <Svg key={`b-${r.cle}`} source={svgFil({ largeur: w, progression: r.progression, avant: r.avant, niveau: r.niveau, niveauAvant: r.niveauAvant, fini: r.fini, eclat: r.eclat, mot: r.mot, graine: graineDe(r.cle), majLe: r.majLe, maintenant })} alt={`${r.titre} : ${r.mot}, ${pct}`} width={w} height={HAUTEUR_FIL} />
+    : <Svg key={`b-${r.cle}`} source={svgFil({ largeur: w, progression: r.progression, avant: r.avant, niveau: r.niveau, niveauAvant: r.niveauAvant, fini: r.fini, eclat: r.eclat, mot: r.mot, graine: graineDe(r.cle), majLe: r.majLe, maintenant, animations })} alt={`${r.titre} : ${r.mot}, ${pct}`} width={w} height={HAUTEUR_FIL} />
   return (
     <Box key={`l-${r.cle}`} flexDirection="row" gap={1} alignItems="center">
       <Box width={COL_ICONE}><Text color={TEXTE_NIVEAU[r.niveau]} wrap="truncate">{r.icone}</Text></Box>
@@ -206,11 +214,11 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   const fermer = s.fermer && lignes.length > 0 && lignes.every(l => l.fini) ? s.fermer : undefined
   // de haut en bas : cette discussion (Claude, puis ses sous-agents), les autres, la jauge, les boutons, les réglages
   const rangs = [
-    ...lignes.map((l, i) => rang(T, surface, colonnes, depuisLigne(l, i === 0 ? fermer : undefined), s.maintenant)),
-    ...autres.map(a => rang(T, surface, colonnes, depuisAutre(a, s.fermerAutre), s.maintenant)),
-    s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.maintenant) : null,
+    ...lignes.map((l, i) => rang(T, surface, colonnes, depuisLigne(l, i === 0 ? fermer : undefined), s.maintenant, s.animations)),
+    ...autres.map(a => rang(T, surface, colonnes, depuisAutre(a, s.fermerAutre), s.maintenant, s.animations)),
+    s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.maintenant, s.animations) : null,
     jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons, s.reglages.jauge ? s.cache : null, s.expliquerCache) : null,
-    jauge && s.reglage?.ouvert ? dessinerReglages(T, s.reglages, s.reglage) : null,
+    jauge && s.reglage?.ouvert ? dessinerReglages(T, surface, s.reglages, s.reglage) : null,
   ].filter(r => r !== null)
   if (rangs.length === 1) return rangs[0]
   return <Box flexDirection="column" gap={1}>{rangs}</Box>

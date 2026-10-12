@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { AUCUN, basculer, changerSeuil, jaugeVisible, lireRelais, lireReglages, toutAllume } from '../hooks/reglages'
+import { AUCUN, basculer, changerSeuil, jaugeVisible, lireAnimations, lireRelais, lireReglages, toutAllume } from '../hooks/reglages'
 
 describe('réglages', () => {
   test('/pupitre allume tout quand tout est éteint', async () => {
@@ -53,5 +53,11 @@ describe('réglages', () => {
     expect(lireRelais({ seuil: 99 })).toEqual({ seuil: 90, auto: false })
     expect(lireRelais({ seuil: 63 })).toEqual({ seuil: 65, auto: false })
     expect([changerSeuil(60, 1), changerSeuil(60, -1), changerSeuil(90, 1), changerSeuil(30, -1)]).toEqual([65, 55, 90, 30])
+  })
+  test('animations : complètes par défaut, un choix enregistré est respecté, le reste revient à complètes', async () => {
+    expect(lireAnimations(undefined)).toBe('completes')
+    expect(lireAnimations('reduites')).toBe('reduites')
+    expect(lireAnimations('coupees')).toBe('coupees')
+    expect(lireAnimations('rapides')).toBe('completes')
   })
 })

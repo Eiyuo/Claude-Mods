@@ -1,4 +1,4 @@
-import type { ReglageRelais, Reglages } from '../types'
+import type { Animations, ReglageRelais, Reglages } from '../types'
 
 export type Commande = 'pupitre' | 'jauge' | 'fil' | 'relais' | 'plume' | 'cap'
 export const COMMANDES: readonly Commande[] = ['pupitre', 'jauge', 'fil', 'relais', 'plume', 'cap']
@@ -45,6 +45,10 @@ export function lireRelais(v: unknown): ReglageRelais {
   const o = (typeof v === 'object' && v !== null ? v : {}) as Record<string, unknown>
   const seuil = typeof o.seuil === 'number' && Number.isFinite(o.seuil) ? o.seuil : 60
   return { seuil: changerSeuil(Math.round(seuil / 5) * 5, 0), auto: o.auto === true }
+}
+
+export function lireAnimations(v: unknown): Animations {
+  return v === 'reduites' || v === 'coupees' ? v : 'completes'
 }
 
 // Le seuil du relais bouge de 5 en 5, entre 30 et 90 %.

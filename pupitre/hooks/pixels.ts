@@ -1,4 +1,4 @@
-import type { Niveau } from '../types'
+import type { Animations, Niveau } from '../types'
 export type { Niveau } from '../types'
 
 export const PALETTES_FIL: readonly (readonly string[])[] = [
@@ -107,7 +107,12 @@ function reflet(fin: number, h: number, c: number): string {
 export type OptionsFil = {
   largeur: number; progression: number; avant: number; niveau: Niveau; niveauAvant: Niveau
   fini: boolean; eclat: boolean; mot: string; graine: number; majLe: number; maintenant: number
+  animations?: Animations // absent : complètes
 }
+
+// Réduites ou coupées, les boucles (étincelles, bande de lumière, tête de lecture, respiration, battement) ne sont pas
+// dessinées du tout : l'image est plus légère et le bureau n'a plus rien à animer en continu.
+const enBoucle = (a: Animations | undefined) => a === undefined || a === 'completes'
 
 const retard = (ms: number) => `animation-delay:calc(var(--u) + ${ms}ms)`
 const RANGS = (n: number) => Array.from({ length: n }, (_, i) => i)
@@ -137,6 +142,7 @@ function dessinerFil(o: OptionsFil, c: number): string {
   const fin = o.fini ? W : Math.round(Math.max(0, Math.min(1, o.progression)) * W)
   const finAvant = Math.round(Math.max(0, Math.min(1, o.avant)) * W)
   const endormie = assoupie(o)
+  const boucles = enBoucle(o.animations)
   const fond = new Groupes()
   const sur = new Groupes()
   const eclair = new Groupes()
@@ -150,14 +156,14 @@ function dessinerFil(o: OptionsFil, c: number): string {
     let col = teinte(pal, t, o.fini, i, j)
     if (!o.fini && fin - x < 10) col = clair(col, 0.22 * (1 - (fin - x) / 10))
     const nouvelle = !o.fini && x >= finAvant
-    const bord = !o.fini && !endormie && fin - x <= 2 * c // tête de lecture : les 2 dernières colonnes clignotent
+    const bord = boucles && !o.fini && !endormie && fin - x <= 2 * c // tête de lecture : les 2 dernières colonnes clignotent
     fond.case(col, bord ? `h${j}` : nouvelle ? `a${Math.floor(rr * 6)}` : '', x, j * c, w, c)
     if (nouvelle) sur.case('#FFFFFF', `b${Math.floor(rr * 6)}`, x, j * c, w, c)
     // Vague : l'ancienne couleur s'efface tranche par tranche, de gauche à droite ; à la fin du travail, un flash la suit.
     const pas = Math.min(PAS - 1, Math.floor(x / W * PAS))
     if (o.eclat || (o.niveauAvant !== o.niveau && x < finAvant)) sur.case(teinte(palAvant, t, false, i, j), `f${pas}`, x, j * c, w, c)
     if (o.eclat && j === 0) eclair.case('#FFFFFF', `w${pas}`, x, 0, w, H)
-    if (!endormie && bruit(k * 7 + 3, o.graine) < 0.018) etincelles += `<rect class="e" x="${x}" y="${j * c}" width="${w}" height="${c}" fill="#FFFFFF" style="animation-delay:calc(var(--t) - ${(b * 1.6).toFixed(2)}s)"/>`
+    if (boucles && !endormie && bruit(k * 7 + 3, o.graine) < 0.018) etincelles += `<rect class="e" x="${x}" y="${j * c}" width="${w}" height="${c}" fill="#FFFFFF" style="animation-delay:calc(var(--t) - ${(b * 1.6).toFixed(2)}s)"/>`
   }
   const cw = Math.round(Array.from(o.mot).length * 5.6) + 10
   const kx = Math.max(3, Math.min(W - cw - 3, fin - cw - 3))
@@ -165,7 +171,7 @@ function dessinerFil(o: OptionsFil, c: number): string {
   const glisse = kxAvant !== kx ? `animation:glisse .5s cubic-bezier(.34,1.56,.64,1) both;${retard(0)};` : ''
   // Tête de lecture : quelques pixels se détachent du bord vers la droite, tant que ça travaille.
   let fuite = ''
-  if (!o.fini && !endormie && fin > 0 && fin < W - 6) {
+  if (boucles && !o.fini && !endormie && fin > 0 && fin < W - 6) {
     for (let n = 0; n < 4; n++) fuite += `<rect class="v" x="${fin}" y="${Math.min(H - c, ((n * 5) % rows) * c)}" width="${c}" height="${c}" fill="${pal[3]}" style="animation-delay:calc(var(--t) - ${(n * 0.33).toFixed(2)}s)"/>`
   }
   // Fanfare : confettis lancés en arc depuis le bout quand le flash l'atteint ; ils restent dans les 18 px de l'image.
@@ -189,7 +195,7 @@ ${RANGS(PAS).map(i => `.f${i},.w${i}{${retard(i * 15)}}`).join('')}
 ${RANGS(6).map(j => `.h${j}{animation:clignote .9s ease-in-out infinite;animation-delay:calc(var(--t) - ${(j * 0.07).toFixed(2)}s)}`).join('')}
 @keyframes clignote{0%,100%{opacity:1}50%{opacity:.2}}
 .v{opacity:0;animation:fuite 1.3s ease-out infinite}@keyframes fuite{from{transform:none;opacity:.9}to{transform:translateX(22px);opacity:0}}
-.z{opacity:.6;animation:dort 3.4s ease-in-out infinite;animation-delay:var(--t)}@keyframes dort{0%,100%{opacity:.9}50%{opacity:.4}}
+.z{opacity:.6}${boucles ? '.z{animation:dort 3.4s ease-in-out infinite;animation-delay:var(--t)}@keyframes dort{0%,100%{opacity:.9}50%{opacity:.4}}' : ''}
 .k{transform:translateX(${kx}px);${glisse}}@keyframes glisse{from{transform:translateX(${kxAvant}px)}to{transform:translateX(${kx}px)}}
 .pop{transform-origin:${cw / 2}px 9px;animation:pop .5s cubic-bezier(.34,1.56,.64,1);${retard(0)}}@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
 .g{opacity:0;animation:gerbe .9s ease-out forwards}@keyframes gerbe{0%{transform:none;opacity:1}45%{transform:translate(calc(var(--dx) * .55),var(--up));opacity:1}100%{transform:translate(var(--dx),var(--dy));opacity:0}}`
@@ -197,7 +203,7 @@ ${RANGS(6).map(j => `.h${j}{animation:clignote .9s ease-in-out infinite;animatio
     `<style>${css}</style>` +
     `<defs><clipPath id="p"><rect width="${W}" height="${H}" rx="7"/></clipPath><clipPath id="q"><rect width="${fin}" height="${H}"/></clipPath></defs>` +
     `<rect width="${W}" height="${H}" rx="7" fill="rgba(128,128,128,.12)" stroke="rgba(128,128,128,.35)" stroke-width=".5"/>` +
-    `<g clip-path="url(#p)" shape-rendering="crispEdges">${endormie ? `<g class="z">${fond.svg()}</g>` : fond.svg()}${sur.svg()}${eclair.svg()}${etincelles}${fuite}<g clip-path="url(#q)">${o.fini || endormie ? '' : reflet(fin, H, c)}</g></g>` +
+    `<g clip-path="url(#p)" shape-rendering="crispEdges">${endormie ? `<g class="z">${fond.svg()}</g>` : fond.svg()}${sur.svg()}${eclair.svg()}${etincelles}${fuite}<g clip-path="url(#q)">${o.fini || endormie || !boucles ? '' : reflet(fin, H, c)}</g></g>` +
     gerbe +
     `<g class="k"><g${o.eclat ? ' class="pop"' : ''}><rect y="3" width="${cw}" height="12" rx="3" fill-opacity=".8" fill="${pal[3]}" stroke="rgba(255,255,255,.3)" stroke-width=".5"/>` +
     `<text x="5" y="9.5" dominant-baseline="middle" fill="#FFFFFF" font-size="10" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${echapper(o.mot)}</text></g></g>` +
@@ -207,10 +213,12 @@ ${RANGS(6).map(j => `.h${j}{animation:clignote .9s ease-in-out infinite;animatio
 const LIMITE = 125000
 
 export function svgFil(o: OptionsFil): string {
-  return memoise(JSON.stringify({ ...o, maintenant: 0, endormie: assoupie(o) }), () => {
+  // coupées : la barre est dessinée comme si rien ne venait de changer (ni colonnes neuves, ni vague, ni fanfare)
+  const p = o.animations === 'coupees' ? { ...o, avant: o.fini ? 1 : o.progression, niveauAvant: o.niveau, eclat: false } : o
+  return memoise(JSON.stringify({ ...p, maintenant: 0, endormie: assoupie(p) }), () => {
     let s = ''
     for (const c of [3, 4, 5, 6, 8]) {
-      s = dessinerFil(o, c)
+      s = dessinerFil(p, c)
       if (s.length < LIMITE) return s
     }
     return s
@@ -222,6 +230,7 @@ export type OptionsSimple = {
   progression: number; palette: readonly string[]; graine: number; maintenant: number
   titre?: string // info-bulle au survol (l'élément Svg interactif affiche les <title>)
   alerte?: boolean // jauge critique : double battement blanc sur la partie remplie
+  animations?: Animations // absent : complètes
 }
 const CSS_ALERTE = '.c{opacity:0;animation:coeur 1.6s ease-in-out infinite;animation-delay:var(--t)}@keyframes coeur{0%,40%,100%{opacity:0}10%,30%{opacity:.4}20%{opacity:.05}}'
 
@@ -230,16 +239,18 @@ function dessinerSimple(o: OptionsSimple, c: number): string {
   const H = o.hauteur
   const rows = Math.floor(H / c)
   const fin = Math.round(Math.max(0, Math.min(1, o.progression)) * W)
+  const boucles = enBoucle(o.animations)
+  const alerte = o.alerte && boucles
   const fond = new Groupes()
   for (let x = 0, i = 0; x < fin; x += c, i++) for (let j = 0; j < rows; j++) {
     fond.case(teinte(o.palette, x / Math.max(fin, 1), false, i, j), '', x, j * c, Math.min(c, fin - x), c)
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     (o.titre ? `<title>${echapper(o.titre)}</title>` : '') +
-    `<style>${CSS_COMMUN(o.maintenant, o.maintenant)}${o.alerte ? CSS_ALERTE : ''}</style>` +
+    `<style>${CSS_COMMUN(o.maintenant, o.maintenant)}${alerte ? CSS_ALERTE : ''}</style>` +
     `<defs><clipPath id="p"><rect width="${W}" height="${H}" rx="${o.rayon}"/></clipPath><clipPath id="q"><rect width="${fin}" height="${H}"/></clipPath></defs>` +
     `<rect width="${W}" height="${H}" rx="${o.rayon}" fill="rgba(128,128,128,.12)" stroke="rgba(128,128,128,.35)" stroke-width=".5"/>` +
-    `<g clip-path="url(#p)" shape-rendering="crispEdges">${fond.svg()}<g clip-path="url(#q)">${reflet(fin, H, c)}</g>${o.alerte ? `<rect class="c" width="${fin}" height="${H}" fill="#FFFFFF"/>` : ''}</g></svg>`
+    `<g clip-path="url(#p)" shape-rendering="crispEdges">${fond.svg()}<g clip-path="url(#q)">${boucles ? reflet(fin, H, c) : ''}</g>${alerte ? `<rect class="c" width="${fin}" height="${H}" fill="#FFFFFF"/>` : ''}</g></svg>`
 }
 
 export function svgSimple(o: OptionsSimple): string {

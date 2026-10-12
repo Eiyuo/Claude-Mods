@@ -585,3 +585,66 @@ test('« Tout éteindre » retire la bande', async ($, on) => {
   expect(await ui.find({ type: 'Button', text: 'Réglages' })).toBeUndefined()
   await ui.unmount()
 })
+
+const BOUCLES = /class="(e|r|v|c|h\d)"/ // étincelles, bande de lumière, pixels qui fuient, battement, tête qui clignote
+const sources = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
+  (await ui.findAll({ type: 'Svg' })).map(s => String(s.props.source))
+
+// Une session qui démarre avec, sur le disque, ce que `store` contient ; rend de quoi en démarrer une autre.
+async function demarrer($: any, on: any, store: Record<string, unknown> = {}) {
+  mock.store(on, store)
+  mock.clock(on, { now: 1_000_000 })
+  mock.env(on, { USERPROFILE: 'C:/Users/essai' })
+  on('session.start', async (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
+  on('command.register', async () => ({ value: undefined }) as never)
+  on('session.id', async () => ({ value: 'moi' }) as never)
+  on('session.cwd', async () => ({ value: 'C:/Users/essai/ici' }) as never)
+  // contexte à 40 % : une jauge remplie, où passe la bande de lumière
+  on('session.usage', async () => ({ value: { context: { window: 200_000, tokens: 80_000 }, rateLimits: [] } }) as never)
+  on('ui.render', async () => ({ type: 'Text', props: {}, children: ['(bande du moteur)'] }) as never)
+  const lancer = () => $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
+  await lancer()
+  return lancer
+}
+
+test('« Animations » réduites : les jauges ne tournent plus en boucle, et le choix est gardé pour la session suivante', async ($, on) => {
+  const relancer = await demarrer($, on)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect((await sources(ui)).some(s => BOUCLES.test(s))).toBe(true)
+  await ui.press({ key: 'reglages' })
+  expect(JSON.stringify(await ui.drawn())).toContain('Animations :')
+  for (const l of ['✓ Complètes', '○ Réduites', '○ Coupées']) expect(await libelles(ui)).toContain(l)
+  await ui.press({ key: 'animations-reduites' })
+  expect(await libelles(ui)).toContain('✓ Réduites')
+  expect(await libelles(ui)).toContain('○ Complètes')
+  const apres = await sources(ui)
+  expect(apres.length).toBe(3)
+  for (const s of apres) expect(s).not.toMatch(BOUCLES)
+  await ui.press({ key: 'replier' })
+  await ui.unmount()
+  await relancer() // la session suivante relit le réglage sur le disque
+  const ensuite = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ensuite.press({ key: 'reglages' })
+  expect(await libelles(ensuite)).toContain('✓ Réduites')
+  await ensuite.unmount()
+})
+
+test('« Animations » n apparaît que là où les barres sont des images, pas au terminal', async ($, on) => {
+  await preparer($, on)
+  for (const [surface, visible] of [['terminal', false], ['desktop', true]] as const) {
+    const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
+    await ui.press({ key: 'reglages' })
+    expect(JSON.stringify(await ui.drawn()).includes('Animations :')).toBe(visible)
+    await ui.press({ key: 'replier' })
+    await ui.unmount()
+  }
+})
+
+test('« Animations » : coupées, enregistré avant le démarrage, s applique tout de suite', async ($, on) => {
+  await demarrer($, on, { animations: 'coupees' })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  for (const s of await sources(ui)) expect(s).not.toMatch(BOUCLES)
+  await ui.press({ key: 'reglages' })
+  expect(await libelles(ui)).toContain('✓ Coupées')
+  await ui.unmount()
+})

@@ -1,8 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Autre, LigneFil, Mesures, Plume, ReglageRelais, Reglages } from '../types'
-import { AUCUN, basculer, changerSeuil, jaugeVisible, lireRelais, lireReglages, type Commande } from './reglages'
+import type { Animations, Autre, LigneFil, Mesures, Plume, ReglageRelais, Reglages } from '../types'
+import { AUCUN, basculer, changerSeuil, jaugeVisible, lireAnimations, lireRelais, lireReglages, type Commande } from './reglages'
 import { MESURES_VIDES, lireMesures, pourcentageCache, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
 import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
@@ -22,6 +22,7 @@ export const ouvertA = atom({ plugin: 'pupitre', key: 'reglagesOuverts' } as con
 export const chargeA = atom({ plugin: 'pupitre', key: 'charge' } as const, false)
 export const relaisA = atom({ plugin: 'pupitre', key: 'relais' } as const, lireRelais(undefined) as ReglageRelais)
 export const cacheA = atom({ plugin: 'pupitre', key: 'cache' } as const, null as number | null)
+export const animationsA = atom({ plugin: 'pupitre', key: 'animations' } as const, 'completes' as Animations)
 
 let derniereUsage: UsageLu | null = null
 
@@ -103,6 +104,11 @@ async function reglerRelais($: Dollar, f: (r: ReglageRelais) => ReglageRelais): 
   seuilPasse = false
 }
 
+async function choisirAnimations($: Dollar, a: Animations): Promise<void> {
+  await update($, animationsA, () => a)
+  await $.store.set('animations', a)
+}
+
 // Réglages (gardés sur le disque) et mesures : au démarrage, et de nouveau après un /clear.
 async function charger($: Dollar): Promise<void> {
   const garde = lireReglages(await $.store.get('reglages'))
@@ -113,6 +119,8 @@ async function charger($: Dollar): Promise<void> {
   await update($, mesuresA, () => lireMesures(derniereUsage!, maintenant))
   const relais = lireRelais(await $.store.get('relais'))
   await update($, relaisA, () => relais)
+  const animations = lireAnimations(await $.store.get('animations'))
+  await update($, animationsA, () => animations)
   await update($, plumeA, p => ({ ...p, enCours: false })) // un rechargement en pleine amélioration ne bloque pas le bouton
   await update($, chargeA, () => true)
 }
@@ -434,9 +442,11 @@ export const register: Register = on => {
     await read($, maintenantA) // abonne la bande au tic d'une seconde ; les images, elles, veulent l'heure exacte du dessin
     const maintenant = await $.clock.now()
     const cache = await read($, cacheA)
+    const animations = await read($, animationsA)
     const arbre = dessinerBande(T, e.surface, e.props.bodyColumns, e.props.maxRows, {
       reglages: r,
       mesures,
+      animations,
       cache,
       expliquerCache: () => { if (cache !== null) $.ui.toast(explicationCache(cache)) },
       lignes,
@@ -452,6 +462,8 @@ export const register: Register = on => {
         relais,
         seuil: sens => { void reglerRelais($, x => ({ ...x, seuil: changerSeuil(x.seuil, sens) })) },
         auto: () => { void reglerRelais($, x => ({ ...x, auto: !x.auto })) },
+        animations,
+        choisirAnimations: a => { void choisirAnimations($, a) },
       },
     })
     return arbre === null ? next(e) : (arbre as never)

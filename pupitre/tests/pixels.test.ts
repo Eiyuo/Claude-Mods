@@ -106,6 +106,37 @@ describe('animations : attente, tête de lecture, vague, fanfare, alerte', () =>
   })
 })
 
+describe('réglage des animations', () => {
+  const BOUCLES = /class="(e|r|v|c|h\d)"/ // étincelles, bande de lumière, pixels qui fuient, battement, tête qui clignote
+  const TRAVAIL = { ...BASE, avant: 0.2, niveauAvant: 0 as const } // des colonnes neuves et un changement de couleur
+  const FINI = { ...BASE, progression: 1, avant: 0.6, niveau: 3 as const, niveauAvant: 2 as const, fini: true, eclat: true }
+  const ALERTE = { largeur: 200, hauteur: 10, cellule: 2, rayon: 4, progression: 0.93, palette: PALETTES_FIL[0]!, graine: 1, maintenant: 0, alerte: true }
+  test('complètes (le réglage de départ) : les boucles tournent', async () => {
+    expect(svgFil(TRAVAIL)).toMatch(BOUCLES)
+    expect(svgSimple(ALERTE)).toMatch(BOUCLES)
+  })
+  test('réduites : plus aucune boucle, mais les effets d un changement jouent encore une fois', async () => {
+    const travail = svgFil({ ...TRAVAIL, animations: 'reduites' })
+    expect(travail).not.toMatch(BOUCLES)
+    expect(travail).toMatch(/class="a\d"/) // colonnes neuves
+    expect(travail).toContain('class="f0"') // vague de couleur
+    const fin = svgFil({ ...FINI, animations: 'reduites' })
+    expect(fin).not.toMatch(BOUCLES)
+    expect(fin).toContain('class="w0"') // flash de fin
+    expect(fin).toContain('class="g"') // confettis
+    const attente = svgFil({ ...BASE, majLe: 0, maintenant: 25_000, animations: 'reduites' })
+    expect(attente).toContain('class="z"') // toujours pâle…
+    expect(attente).not.toContain('animation:dort') // … mais sans respirer
+    expect(svgSimple({ ...ALERTE, animations: 'reduites' })).not.toMatch(BOUCLES)
+  })
+  test('coupées : des images fixes, sans aucun effet', async () => {
+    for (const s of [svgFil({ ...TRAVAIL, animations: 'coupees' }), svgFil({ ...FINI, animations: 'coupees' }), svgSimple({ ...ALERTE, animations: 'coupees' })]) {
+      expect(s).not.toMatch(/class="(e|r|v|c|g|z|pop|h\d|a\d|b\d|f\d+|w\d+)"/)
+      expect(s).not.toContain('animation:glisse')
+    }
+  })
+})
+
 describe('rendu comme la maquette : pixels nets, bande de lumière, étiquette discrète', () => {
   const JAUGE = { largeur: 200, hauteur: 10, cellule: 2, rayon: 4, progression: 0.6, palette: PALETTES_FIL[0]!, graine: 1, maintenant: 0 }
   test('pixels nets et opaques : bords francs, plus de respiration transparente', async () => {

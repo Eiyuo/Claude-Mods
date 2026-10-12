@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.3) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.4) |
 
 ## Aperçu
 
@@ -85,6 +85,8 @@ claude plugin uninstall pupitre@claude-mods
 
 **Sans taper de commande : le bouton « Réglages ».** Il est au bout de la ligne des boutons. Un clic déplie juste en dessous la ligne « Pupitre : ✓ Jauge · ✓ Fil · ✓ Relais · ✓ Plume · ✓ Cap · Tout éteindre · Replier », et, quand le relais est allumé, la ligne « Relais à : − 60 % + · ○ Automatique ». Chaque bouton allume (✓) ou éteint (○) sa fonction ; « Tout éteindre » devient « Tout allumer » dès qu'une fonction est éteinte ; « Replier » range la ligne. Si tu éteins tout, la bande disparaît : tape `/pupitre` pour la rallumer.
 
+**Animations.** Toujours dans « Réglages », sur l'application de bureau, la ligne « Animations : ✓ Complètes · ○ Réduites · ○ Coupées » (au terminal, elle n'apparaît pas : les barres y sont déjà en caractères, sans animation). Sur un PC peu puissant, « Réduites » arrête tout ce qui tourne en boucle (étincelles, bande de lumière, bord qui clignote, respiration, battement de la jauge) et ne garde que les effets d'un changement, joués une fois : nouvelles colonnes, vague de couleur, fanfare de fin. « Coupées » laisse des images fixes. Le choix est gardé d'une session à l'autre.
+
 ### La jauge (`/jauge`)
 
 Une seule ligne, avec trois petites barres :
@@ -146,7 +148,7 @@ Quand la barre change de couleur, la nouvelle avance de gauche à droite. **Si r
 
 **Le son.** Un carillon doux de deux notes sonne quand Claude a fini, si la réponse a pris plus de 30 secondes. Pas de son pour les réponses rapides.
 
-Si Windows demande moins d'animations, les étincelles, la bande de lumière, le bord qui clignote, le flash, les confettis et le battement de la jauge sont coupés ; les barres restent lisibles, et une barre en attente reste simplement pâle. Sur un PC peu puissant, c'est le moyen le plus simple d'alléger le pupitre : **Paramètres › Accessibilité › Effets visuels › Effets d'animation**, sur Désactivé.
+Si Windows demande moins d'animations, les étincelles, la bande de lumière, le bord qui clignote, le flash, les confettis et le battement de la jauge sont coupés ; les barres restent lisibles, et une barre en attente reste simplement pâle. Ce réglage de Windows (**Paramètres › Accessibilité › Effets visuels › Effets d'animation**) s'ajoute à la ligne « Animations » des réglages ; pour le pupitre seul, cette ligne suffit.
 
 ### Fixer le cap (`/cap`)
 
