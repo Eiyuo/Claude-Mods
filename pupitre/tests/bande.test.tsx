@@ -222,7 +222,7 @@ test('aucune barre en cadre interactif : un cadre se recharge à chaque changeme
   await ui.unmount()
 })
 
-test('chaque image porte l heure de son dessin : redessinée, son animation ne revient pas en arrière', async ($, on) => {
+test('chaque image porte l heure de son dessin, puis garde le même texte tant qu elle ne change pas', async ($, on) => {
   const horloge = await preparer($, on)
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   await horloge.advance(2_500)
@@ -231,6 +231,12 @@ test('chaque image porte l heure de son dessin : redessinée, son animation ne r
   expect(svgs.length).toBe(4)
   for (const s of svgs) expect(String(s.props.source)).toContain('--t:-1002.50s')
   await ui.unmount()
+  // une seconde plus tard, la bande est redessinée (le chrono avance) : les images, inchangées, n'ont rien à recharger
+  await horloge.advance(1_000)
+  const apres = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(JSON.stringify(await apres.drawn())).toContain('0:03')
+  expect((await apres.findAll({ type: 'Svg' })).map(s => s.props.source)).toEqual(svgs.map(s => s.props.source))
+  await apres.unmount()
 })
 
 // Sur l'application, ce qu'un mod ajoute au prompt système n'arrive pas à Claude (vu à l'essai du relais) :

@@ -81,9 +81,9 @@ function teinte(palette: readonly string[], t: number, fini: boolean, i: number,
   return palette[Math.min(3, (g - lo) * 16 > B4[i % 4]![j % 4]! ? lo + 1 : lo)]!
 }
 
-// Le bureau peut recharger l'image à chaque dessin et ses animations repartent alors de zéro : on les cale sur
-// l'horloge pour qu'elles reprennent où elles en étaient. --t (heure du dessin) pour les boucles, --u (temps écoulé
-// depuis le changement) pour les effets qui ne jouent qu'une fois.
+// Une image qui change est rechargée et ses animations repartiraient de zéro : on les cale sur l'horloge pour
+// qu'elles reprennent où elles en étaient. --t (heure du dessin) pour les boucles, --u (temps écoulé depuis le
+// changement) pour les effets qui ne jouent qu'une fois.
 const CSS_COMMUN = (maintenant: number, majLe: number) => `svg{--t:${(-maintenant / 1000).toFixed(2)}s;--u:${((majLe - maintenant) / 1000).toFixed(2)}s}
 .e{opacity:0;animation:etincelle 1.6s ease-in-out infinite}
 @keyframes etincelle{0%,35%,65%,100%{opacity:0}50%{opacity:.85}}
@@ -113,6 +113,20 @@ const retard = (ms: number) => `animation-delay:calc(var(--u) + ${ms}ms)`
 const RANGS = (n: number) => Array.from({ length: n }, (_, i) => i)
 export const HAUTEUR_FIL = 18 // une ligne de texte : la barre tient sur la ligne de son titre
 const ATTENTE_MS = 20_000 // rien de changé depuis ce temps (outil, étape, %) : la barre s'assoupit
+const assoupie = (o: OptionsFil) => !o.fini && o.maintenant - o.majLe >= ATTENTE_MS
+
+// Le chrono redessine la bande chaque seconde : une image qui n'a pas changé rend le même texte, sans être recalculée,
+// et le bureau n'a rien à recharger. L'heure n'entre pas dans la clé : --t et --u restent ceux de son premier dessin.
+const dessins = new Map<string, string>()
+function memoise(cle: string, dessiner: () => string): string {
+  let s = dessins.get(cle)
+  if (s === undefined) {
+    if (dessins.size >= 32) dessins.clear() // les images affichées sont redessinées une fois, à la bonne heure
+    s = dessiner()
+    dessins.set(cle, s)
+  }
+  return s
+}
 
 function dessinerFil(o: OptionsFil, c: number): string {
   const W = Math.max(40, Math.round(o.largeur))
@@ -122,7 +136,7 @@ function dessinerFil(o: OptionsFil, c: number): string {
   const palAvant = PALETTES_FIL[o.niveauAvant]!
   const fin = o.fini ? W : Math.round(Math.max(0, Math.min(1, o.progression)) * W)
   const finAvant = Math.round(Math.max(0, Math.min(1, o.avant)) * W)
-  const endormie = !o.fini && o.maintenant - o.majLe >= ATTENTE_MS
+  const endormie = assoupie(o)
   const fond = new Groupes()
   const sur = new Groupes()
   const eclair = new Groupes()
@@ -193,12 +207,14 @@ ${RANGS(6).map(j => `.h${j}{animation:clignote .9s ease-in-out infinite;animatio
 const LIMITE = 125000
 
 export function svgFil(o: OptionsFil): string {
-  let s = ''
-  for (const c of [3, 4, 5, 6, 8]) {
-    s = dessinerFil(o, c)
-    if (s.length < LIMITE) return s
-  }
-  return s
+  return memoise(JSON.stringify({ ...o, maintenant: 0, endormie: assoupie(o) }), () => {
+    let s = ''
+    for (const c of [3, 4, 5, 6, 8]) {
+      s = dessinerFil(o, c)
+      if (s.length < LIMITE) return s
+    }
+    return s
+  })
 }
 
 export type OptionsSimple = {
@@ -227,12 +243,14 @@ function dessinerSimple(o: OptionsSimple, c: number): string {
 }
 
 export function svgSimple(o: OptionsSimple): string {
-  let s = ''
-  for (const c of [o.cellule, o.cellule + 1, o.cellule + 2, o.cellule * 3]) {
-    s = dessinerSimple(o, c)
-    if (s.length < LIMITE) return s
-  }
-  return s
+  return memoise(JSON.stringify({ ...o, maintenant: 0 }), () => {
+    let s = ''
+    for (const c of [o.cellule, o.cellule + 1, o.cellule + 2, o.cellule * 3]) {
+      s = dessinerSimple(o, c)
+      if (s.length < LIMITE) return s
+    }
+    return s
+  })
 }
 
 export function barreTexte(progression: number, largeur: number): string {

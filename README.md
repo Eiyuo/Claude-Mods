@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.2) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.3) |
 
 ## Aperçu
 
@@ -146,7 +146,7 @@ Quand la barre change de couleur, la nouvelle avance de gauche à droite. **Si r
 
 **Le son.** Un carillon doux de deux notes sonne quand Claude a fini, si la réponse a pris plus de 30 secondes. Pas de son pour les réponses rapides.
 
-Si Windows demande moins d'animations, les étincelles, la bande de lumière, le bord qui clignote, le flash, les confettis et le battement de la jauge sont coupés ; les barres restent lisibles, et une barre en attente reste simplement pâle.
+Si Windows demande moins d'animations, les étincelles, la bande de lumière, le bord qui clignote, le flash, les confettis et le battement de la jauge sont coupés ; les barres restent lisibles, et une barre en attente reste simplement pâle. Sur un PC peu puissant, c'est le moyen le plus simple d'alléger le pupitre : **Paramètres › Accessibilité › Effets visuels › Effets d'animation**, sur Désactivé.
 
 ### Fixer le cap (`/cap`)
 

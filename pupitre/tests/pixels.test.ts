@@ -45,6 +45,11 @@ describe('svgFil', () => {
   test('le même état donne exactement le même SVG (aucun recalcul inutile)', async () => {
     expect(svgFil(BASE)).toBe(svgFil(BASE))
   })
+  test('d une seconde à l autre, une image inchangée garde le même texte : le bureau n a rien à recharger', async () => {
+    expect(svgFil({ ...BASE, majLe: 7000, maintenant: 8000 })).toBe(svgFil({ ...BASE, majLe: 7000, maintenant: 9000 }))
+    const jauge = { largeur: 160, hauteur: 10, cellule: 2, rayon: 4, progression: 0.3, palette: PALETTES_FIL[1]!, graine: 2, maintenant: 8000 }
+    expect(svgSimple({ ...jauge, maintenant: 9000 })).toBe(svgSimple(jauge))
+  })
   test('reste sous 125 000 caractères même très large, avec fondu et éclat', async () => {
     for (const largeur of [300, 900, 1600, 2600]) {
       const s = svgFil({ ...BASE, largeur, progression: 1, avant: 0, niveau: 3, niveauAvant: 2, fini: true, eclat: true })
