@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { appliquerAppel, debutTour, estimation, etape, finir, ligneDe, lignesGardees, motEtape, nouveauSuivi, vue } from '../hooks/fil'
+import { appliquerAppel, debutTour, encoreVisible, estimation, etape, finir, ligneDe, lignesGardees, motEtape, nouveauSuivi, vue } from '../hooks/fil'
 
 describe('mots d étape', () => {
   test('outils connus, connecteurs, navigateur, inconnu', async () => {
@@ -101,25 +101,25 @@ describe('lignes', () => {
     expect(l2.avant).toBe(l2.progression)
     expect(l2.majLe).toBe(200)
   })
-  test('une tâche finie : glissement depuis l ancienne progression, et niveau stable à 1/3', async () => {
+  test('une tâche finie : glissement depuis l ancienne progression, et étape stable à 1/3', async () => {
     let s = nouveauSuivi(0)
     for (const id of ['1', '2', '3']) s = appliquerAppel(s, 'TaskCreate', { subject: id }, { task: { id, subject: id } })
     const l0 = ligneDe('a', 'Sous-agent 1', s, 0, undefined)
     s = appliquerAppel(s, 'TaskUpdate', { taskId: '1', status: 'completed' }, {})
     const l1 = ligneDe('a', 'Sous-agent 1', s, 10, l0)
     expect(l1.avant).toBe(0)
-    expect(l1.niveau).toBe(1)
+    expect(l1.niveau).toBe(2) // 1/3 : la troisième des six couleurs
     expect(l1.niveauAvant).toBe(0)
     const l2 = ligneDe('a', 'Sous-agent 1', appliquerAppel(s, 'Grep', {}, {}), 20, l1)
-    expect(l2.niveau).toBe(1)
-    expect(l2.niveauAvant).toBe(1)
+    expect(l2.niveau).toBe(2)
+    expect(l2.niveauAvant).toBe(2)
   })
   test('fin : éclat une seule fois', async () => {
     const s = nouveauSuivi(0)
     const l0 = ligneDe('claude', 'Claude', s, 0, undefined)
     const l1 = ligneDe('claude', 'Claude', finir(s, 10), 10, l0)
     expect(l1.eclat).toBe(true)
-    expect(l1.niveau).toBe(3)
+    expect(l1.niveau).toBe(6)
     const l2 = ligneDe('claude', 'Claude', finir(s, 10), 20, l1)
     expect(l2.eclat).toBe(false)
   })
@@ -131,4 +131,25 @@ test('au rechargement du mod, les barres finies restent (avec leur croix), les b
   const finie = ligneDe('claude', 'Claude', finir(s, 2000), 2000, undefined)
   expect(lignesGardees([finie, enCours]).map(l => l.id)).toEqual(['claude'])
   expect(lignesGardees([])).toEqual([])
+})
+
+test('Claude attend ta réponse : de sa question jusqu à ta réponse, et jamais une fois fini', async () => {
+  const s = nouveauSuivi(0)
+  expect(s.attente).toBe(false)
+  const question = etape(s, 'AskUserQuestion')
+  expect(question.attente).toBe(true)
+  expect(etape(question, 'Read').attente).toBe(false)
+  expect(appliquerAppel(question, 'AskUserQuestion', {}, { answers: {} }).attente).toBe(false) // tu as répondu
+  expect(debutTour(question, 10).attente).toBe(false)
+  const l0 = ligneDe('claude', 'Claude', s, 0, undefined)
+  const l1 = ligneDe('claude', 'Claude', question, 100, l0)
+  expect(l1.attente).toBe(true)
+  expect(l1.majLe).toBe(100) // l'appel est un changement : la barre se redessine tout de suite
+  expect(ligneDe('claude', 'Claude', finir(question, 200), 200, l1).attente).toBe(false)
+})
+
+test('une barre finie reste visible 5 s après être passée au vert ; une barre en cours, toujours', async () => {
+  expect(encoreVisible(null, 10_000_000)).toBe(true)
+  expect(encoreVisible(1000, 5999)).toBe(true)
+  expect(encoreVisible(1000, 6000)).toBe(false)
 })

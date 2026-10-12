@@ -2,7 +2,20 @@ import { describe, expect, test } from 'claude-code/testing'
 import { ficheDe, lireFiche, nomFichier, suivreAutres, titreDe } from '../hooks/partage'
 import type { LigneFil } from '../types'
 
-const L: LigneFil = { id: 'claude', qui: 'Claude', tache: 'Tâche 2 · B', mot: 'Lecture', compteur: '1 / 3', progression: 1 / 3, avant: 0, niveau: 1, niveauAvant: 0, fini: false, eclat: false, debut: 100, majLe: 900, finiLe: null }
+const L: LigneFil = { id: 'claude', qui: 'Claude', tache: 'Tâche 2 · B', mot: 'Lecture', compteur: '1 / 3', progression: 1 / 3, avant: 0, niveau: 1, niveauAvant: 0, fini: false, eclat: false, attente: false, debut: 100, majLe: 900, finiLe: null }
+
+test('l attente d une réponse passe d une fenêtre à l autre ; une fiche d une version précédente se relit sans', async () => {
+  expect(lireFiche(JSON.stringify(ficheDe('a', 'T', { ...L, attente: true }, 1000)))!.attente).toBe(true)
+  expect(lireFiche(JSON.stringify(ficheDe('a', 'T', { ...L, attente: true, fini: true, finiLe: 900 }, 1000)))!.attente).toBe(false)
+  const { attente: _, ...ancienne } = ficheDe('a', 'T', L, 1000)
+  expect(lireFiche(JSON.stringify(ancienne))!.attente).toBe(false)
+  expect(suivreAutres([], [ficheDe('a', 'T', { ...L, attente: true }, 1000)], 'moi', 1000)[0]!.attente).toBe(true)
+})
+
+test('l étape (six couleurs, puis 6 pour la fin) passe d une fenêtre à l autre ; une étape inconnue revient à 0', async () => {
+  for (const niveau of [5, 6] as const) expect(lireFiche(JSON.stringify(ficheDe('a', 'T', { ...L, niveau }, 1000)))!.niveau).toBe(niveau)
+  expect(lireFiche(JSON.stringify({ ...ficheDe('a', 'T', L, 1000), niveau: 7 }))!.niveau).toBe(0)
+})
 
 describe('partage', () => {
   test('fiche écrite puis relue', async () => {

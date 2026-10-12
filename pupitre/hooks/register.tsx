@@ -5,7 +5,7 @@ import type { Animations, Autre, LigneFil, Mesures, Plume, ReglageRelais, Reglag
 import { AUCUN, basculer, changerSeuil, jaugeVisible, lireAnimations, lireRelais, lireReglages, type Commande } from './reglages'
 import { MESURES_VIDES, lireMesures, pourcentageCache, type UsageLu } from './jauge'
 import { dessinerBande, type Bouton, type Elements } from './bande'
-import { appliquerAppel, debutTour, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
+import { appliquerAppel, debutTour, encoreVisible, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
 import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, explicationCache, messageHumain, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 
@@ -182,6 +182,15 @@ async function effacerFinies($: Dollar): Promise<void> {
   await update($, autresA, l => l.filter(a => a.finiLe === null))
 }
 
+// Une barre finie s'efface toute seule 5 s après être passée au vert, comme si on avait cliqué sa croix ;
+// ici, comme chez les autres discussions. Une barre en cours reste.
+async function effacerVieillesFinies($: Dollar, maintenant: number): Promise<void> {
+  let change = false
+  for (const [k, s] of suivis) if (!encoreVisible(s.fin, maintenant)) { suivis.delete(k); change = true }
+  if (change || (await read($, lignesA)).some(l => !encoreVisible(l.finiLe, maintenant))) await majLignes($)
+  if ((await read($, autresA)).some(a => !encoreVisible(a.finiLe, maintenant))) await update($, autresA, l => l.filter(a => encoreVisible(a.finiLe, maintenant)))
+}
+
 async function revenir($: Dollar): Promise<void> {
   const p = await read($, plumeA)
   if (p.original === null) return
@@ -254,6 +263,7 @@ export const register: Register = on => {
           await update($, lignesA, () => gardeClear.lignes)
           await update($, autresA, () => gardeClear.autres)
         }
+        await effacerVieillesFinies($, await $.clock.now())
         const lignes = await read($, lignesA)
         if (lignes.some(l => !l.fini)) await majLignes($)
       })()
@@ -367,13 +377,13 @@ export const register: Register = on => {
       void carillon($).catch(() => { /* pas de sortie audio */ })
     }
     if (!e.agentId) {
-      // fin de la réponse : tout passe au vert et reste affiché jusqu'à « Fermer » ou la prochaine demande
+      // fin de la réponse : tout passe au vert, puis s'efface au bout de 5 s (ou à « Fermer », ou à la prochaine demande)
       const maintenant = await $.clock.now()
       let change = false
       for (const [k, s] of suivis) if (s.fin === null) { suivis.set(k, finir(s, maintenant)); change = true }
       if (change) await majLignes($)
     } else {
-      // un sous-agent fini pendant que Claude travaille encore : sa ligne passe au vert et reste jusqu'à la croix
+      // un sous-agent fini pendant que Claude travaille encore : sa ligne passe au vert, puis s'efface au bout de 5 s
       const s = suivis.get(id)
       if (s && s.fin === null) {
         suivis.set(id, finir(s, await $.clock.now()))

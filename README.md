@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.4) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.5) |
 
 ## Aperçu
 
@@ -14,13 +14,13 @@ La bande s'affiche au-dessus de la zone de texte. On y trouve la jauge (mémoire
 
 **Les barres de travail** (`/fil`) : une par travail en cours. Elles changent de couleur en avançant, et l'étiquette donne l'étape en cours. Les images ci-dessous sont dessinées par le code du mod lui-même :
 
-<img src="docs/images/fil-1.svg" width="540" alt="Barre violette à 25 %, étape Lecture">
+<img src="docs/images/fil-1.svg" width="540" alt="Barre indigo à 25 %, étape Lecture">
 
-<img src="docs/images/fil-2.svg" width="540" alt="Barre bleue à 50 %, étape Écriture">
+<img src="docs/images/fil-2.svg" width="540" alt="Barre cyan à 50 %, étape Écriture">
 
 <img src="docs/images/fil-3.svg" width="540" alt="Barre turquoise à 80 %, étape Commande">
 
-<img src="docs/images/fil-4.svg" width="540" alt="Barre verte pleine : travail fini">
+<img src="docs/images/fil-4.svg" width="540" alt="Barre verte pleine : travail fini en 3 min 42">
 
 **La jauge** passe du vert au rouge à mesure qu'elle se remplit :
 
@@ -131,11 +131,13 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 
 **Une ligne par travail.** Toutes les lignes ont les mêmes colonnes, pour que tout reste aligné :
 
-- un point (« ✓ » quand c'est fini) ;
+- un point (« ✓ » quand c'est fini, « ? » quand Claude attend ta réponse, « ⧉ » pour une autre discussion) ;
 - le début de ta demande, par exemple « Analyse le dossier radar… » ;
 - la barre : des pixels nets, du clair au foncé, une bande de lumière qui la balaie, un bord qui clignote tant que ça travaille, et une petite étiquette au bout, avec l'étape en un mot (Lecture, Recherche, Écriture, Commande, Délégation, Web, Question, Réflexion…) ;
-- le pourcentage et le temps écoulé ;
+- le pourcentage ;
 - la croix **×**, une fois le travail fini. Sa place est gardée sur chaque ligne : toutes les barres ont la même longueur.
+
+**Le temps écoulé** est dans l'étiquette de la barre. Pendant le travail, passe la souris sur la barre : l'étiquette devient « Lecture · 1:48 ». À 100 %, il s'affiche tout seul (« ✓ Fini · 3:42 ») pendant les 5 secondes où la barre reste affichée. Au terminal, où la souris ne compte pas, il s'affiche seulement à 100 %.
 
 **Comment la barre avance.** Si Claude tient une liste de tâches, la barre avance à chaque tâche finie. Sinon (c'est le cas aujourd'hui : Claude Code ne lui donne pas d'outil de liste de tâches), elle avance par estimation : elle ralentit vers 90 %, puis passe à 100 % à la fin.
 
@@ -143,20 +145,25 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 
 | Avancement | Couleur |
 |---|---|
-| 0 à 33 % | Violet |
-| 33 à 66 % | Bleu |
-| 66 à 99 % | Turquoise |
+| 0 à 16 % | Violet |
+| 17 à 33 % | Indigo |
+| 33 à 49 % | Bleu |
+| 50 à 66 % | Cyan |
+| 67 à 83 % | Turquoise |
+| 83 à 99 % | Vert clair |
 | Terminé | Vert, avec « ✓ Fini », un flash et des confettis de pixels |
 
-Quand la barre change de couleur, la nouvelle avance de gauche à droite. **Si rien n'a bougé depuis 20 secondes** (Claude attend ta réponse, une permission, ou réfléchit longuement), la barre pâlit et respire lentement : un coup d'œil suffit pour voir qu'il faut peut-être aller voir.
+Le fond de la barre prend aussi une teinte légère de la couleur en cours, avec un contour assorti. Quand la barre change de couleur, la nouvelle avance de gauche à droite. **Si rien n'a bougé depuis 20 secondes** (Claude attend une permission, ou réfléchit longuement), la barre pâlit et respire lentement : un coup d'œil suffit pour voir qu'il faut peut-être aller voir.
+
+**Quand Claude te pose une question**, sa barre passe à l'orange et pulse doucement, avec « Ta réponse ? » dans l'étiquette et un « ? » orange devant : ça se remarque d'un coup d'œil, et ça ne pâlit jamais. Dès que tu réponds, la barre reprend sa couleur. Avec les animations « Coupées », l'orange reste, sans pulser.
 
 **Où.** Les barres du fil s'affichent au-dessus de la jauge.
 
-**Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa ligne juste sous celle de Claude (« ↳ 1 · sa description »), avec la même barre. Quand il finit, sa ligne passe au vert et reste affichée jusqu'à la croix.
+**Les sous-agents.** Quand Claude délègue une partie du travail, chaque sous-agent a sa ligne juste sous celle de Claude (« ↳ 1 · sa description »), avec la même barre. Quand il finit, sa ligne passe au vert, puis s'efface toute seule au bout de 5 secondes.
 
-**À la fin.** Quand Claude a fini de répondre, les barres passent au vert et restent affichées. La croix **×** au bout de la ligne de Claude les retire. Sinon, elles sont remplacées à ta demande suivante. Dès que 2 barres ou plus sont finies (les tiennes comme celles des autres discussions), le bouton **« Effacer les barres finies »** apparaît sur la ligne des boutons : il retire toutes les barres vertes d'un coup et garde celles en cours.
+**À la fin.** Quand Claude a fini de répondre, les barres passent au vert, puis s'effacent toutes seules au bout de 5 secondes. La croix **×** au bout de la ligne de Claude les retire plus tôt. Dès que 2 barres ou plus sont finies (les tiennes comme celles des autres discussions), le bouton **« Effacer les barres finies »** apparaît sur la ligne des boutons : il retire toutes les barres vertes d'un coup et garde celles en cours.
 
-**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît dans la même liste, avec le nom de son dossier : « Ajoute du beurre… · essai-relais ». Tu suis ainsi tout ce qui tourne, sans changer de fenêtre. Quand elle a fini, sa ligne passe au vert et reste affichée ; la croix **×** au bout de la ligne la retire.
+**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît dans la même liste, sous un petit titre « Autres discussions », avec l'icône ⧉ et le nom de son dossier : « Ajoute du beurre… · essai-relais ». Si son Claude attend une réponse, sa barre passe à l'orange ici aussi. Tu suis ainsi tout ce qui tourne, sans changer de fenêtre. Quand elle a fini, sa ligne passe au vert, puis s'efface au bout de 5 secondes ; la croix **×** au bout de la ligne la retire plus tôt.
 
 **Le son.** Un carillon doux de deux notes sonne quand Claude a fini, si la réponse a pris plus de 30 secondes. Pas de son pour les réponses rapides.
 

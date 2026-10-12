@@ -3,7 +3,8 @@ import { niveauDe } from './pixels'
 
 export type StatutTache = 'pending' | 'in_progress' | 'completed'
 export type Tache = { id: string; sujet: string; statut: StatutTache }
-export type Suivi = { taches: Tache[]; mot: string; debut: number; fin: number | null; crees: number }
+// attente : Claude t'a posé une question (AskUserQuestion) et attend ta réponse ; de l'appel jusqu'à son résultat.
+export type Suivi = { taches: Tache[]; mot: string; debut: number; fin: number | null; crees: number; attente: boolean }
 export type Vue = { tache: string; compteur: string; progression: number; faites: number; total: number; estime: boolean }
 
 const MOTS: Record<string, string> = {
@@ -27,12 +28,12 @@ export function motEtape(outil: string): string {
 }
 
 export function nouveauSuivi(debut: number): Suivi {
-  return { taches: [], mot: 'Réflexion', debut, fin: null, crees: 0 }
+  return { taches: [], mot: 'Réflexion', debut, fin: null, crees: 0, attente: false }
 }
 
 export function debutTour(s: Suivi, maintenant: number): Suivi {
   const enCours = s.taches.some(t => t.statut !== 'completed')
-  return { taches: enCours ? s.taches : [], mot: 'Réflexion', debut: maintenant, fin: null, crees: enCours ? s.crees : 0 }
+  return { taches: enCours ? s.taches : [], mot: 'Réflexion', debut: maintenant, fin: null, crees: enCours ? s.crees : 0, attente: false }
 }
 
 function objet(v: unknown): Record<string, unknown> {
@@ -65,11 +66,11 @@ export function appliquerAppel(s: Suivi, outil: string, entree: unknown, resulta
     })
     crees = taches.length
   }
-  return { ...s, taches, crees, mot: motEtape(outil) }
+  return { ...s, taches, crees, mot: motEtape(outil), attente: false } // l'outil a rendu son résultat : plus d'attente
 }
 
 export function etape(s: Suivi, outil: string): Suivi {
-  return { ...s, mot: motEtape(outil) }
+  return { ...s, mot: motEtape(outil), attente: outil === 'AskUserQuestion' }
 }
 
 export function finir(s: Suivi, maintenant: number): Suivi {
@@ -109,7 +110,8 @@ export function ligneDe(id: string, qui: string, s: Suivi, maintenant: number, p
   const niveau = niveauDe(v.progression, fini)
   const changeProg = !p || p.progression !== v.progression
   const changeNiv = !p || p.niveau !== niveau
-  const change = changeProg || changeNiv || !p || p.mot !== s.mot || p.tache !== v.tache || p.compteur !== v.compteur || p.fini !== fini
+  const attente = !fini && s.attente
+  const change = changeProg || changeNiv || !p || p.mot !== s.mot || p.tache !== v.tache || p.compteur !== v.compteur || p.fini !== fini || p.attente !== attente
   return {
     id, qui, tache: v.tache, mot: s.mot, compteur: v.compteur,
     progression: v.progression,
@@ -118,6 +120,7 @@ export function ligneDe(id: string, qui: string, s: Suivi, maintenant: number, p
     niveauAvant: !p ? niveau : changeNiv ? p.niveau : niveau,
     fini,
     eclat: fini && !(p?.fini ?? false),
+    attente,
     debut: s.debut,
     majLe: change ? maintenant : p!.majLe,
     finiLe: fini ? (p?.finiLe ?? maintenant) : null,
@@ -128,4 +131,10 @@ export function ligneDe(id: string, qui: string, s: Suivi, maintenant: number, p
 // les barres en cours, qu'on ne peut plus suivre, partent.
 export function lignesGardees(lignes: readonly LigneFil[]): LigneFil[] {
   return lignes.filter(l => l.fini)
+}
+
+export const DUREE_FINIE_MS = 5_000 // une barre finie s'efface 5 s après être passée au vert (demande du 12/10/2026)
+
+export function encoreVisible(finiLe: number | null, maintenant: number): boolean {
+  return finiLe === null || maintenant - finiLe < DUREE_FINIE_MS
 }

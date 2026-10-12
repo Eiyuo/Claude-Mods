@@ -26,7 +26,7 @@ Recréer, dans un seul mod Claude Code, cinq fonctions vues dans une vidéo, san
 | /fil, ce qui est mesuré | Tâches finies sur tâches prévues, une ligne pour Claude et une par sous-agent (option 3) |
 | /fil, autres fenêtres | Une ligne fine par autre discussion qui travaille (option 1) |
 | /fil, style | Celui du curseur d'effort « Ultracode » de l'application : piste claire, pixels colorés, curseur. Dans la version « Après » : trame ordonnée, pixels nets et plats, bande de lumière, apparition des pixels (rendu aligné le 11/10 sur la maquette des 7 idées d'animation) |
-| /fil, couleurs | Violet de 0 à 33 %, bleu de 33 à 66 %, turquoise de 66 à 99 %, **vert quand c'est terminé** |
+| /fil, couleurs | Violet de 0 à 33 %, bleu de 33 à 66 %, turquoise de 66 à 99 %, **vert quand c'est terminé**. Remplacé le 12/10/2026 (1.0.5) par « Spectre », choisi sur prototype : six étapes, une par sixième (violet, indigo, bleu, cyan, turquoise, vert clair), puis vert ; la piste prend une teinte légère de l'étape (voir §7) |
 | /fil, curseur | Il prend la couleur foncée de la barre et contient **un mot** décrivant l'étape en cours, en blanc |
 | /fil, sous-agents | Même barre que Claude |
 | /fil, son | Carillon doux de 2 notes à la fin d'une réponse, **seulement si elle a pris plus de 30 s** |
@@ -117,7 +117,7 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 ## 7. Style des barres (commun à /fil et /jauge)
 
 **Piste.**
-- Fond clair, 0,5 px de contour.
+- Fond clair, 0,5 px de contour. Pour /fil, depuis 1.0.5 (« barre entière », choisi sur prototype) : en cours, la piste prend une teinte légère de l'étape (sa nuance la plus claire à 20 %) et un contour de 1 px à sa couleur ; finie, elle redevient neutre.
 - Coins arrondis : 7 px pour /fil (hauteur 22 px), 4 px pour la jauge (hauteur 10 px).
 
 **Pixels.** Des carrés de 3 px pour /fil et de 2 px pour la jauge, sans espace entre eux : la partie remplie est pleine.
@@ -127,8 +127,11 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 | Palette | Nuances |
 |---|---|
 | Violet | #B2A6EE · #9687E4 · #7C6CDC · #6452D0 |
+| Indigo (1.0.5) | #A3ADF0 · #8590E6 · #6875D8 · #4F5BC4 |
 | Bleu | #84A8EC · #6490E6 · #4678DC · #2C60C8 |
+| Cyan (1.0.5) | #7FD0E8 · #5BBCDB · #3AA6CA · #2489B0 |
 | Turquoise | #5CC4BC · #38B2AA · #1E9C96 · #10827C |
+| Vert clair (1.0.5) | #A9D67E · #8CC45C · #70AF42 · #579330 |
 | Vert | #7CC280 · #58B060 · #3C9C48 · #288037 |
 | Orange (jauge) | #F5AA5F · #EE9646 · #E8862A · #D6761E |
 | Rouge (jauge) | #E66E6E · #DE5A5A · #D64545 · #C43737 |
@@ -205,7 +208,7 @@ Ce découpage n'est qu'un point de départ : le plan le précisera. Chaque fichi
 
 Un outil absent de la liste donne « Action ». À la fin, le curseur affiche « ✓ Fini ».
 
-**À droite.** Le compteur (« 3 / 7 ») et le chrono depuis le début de la réponse.
+**À droite.** Le compteur (« 3 / 7 ») et le chrono depuis le début de la réponse. Remplacé le 12/10/2026 (1.0.5) : le chrono n'a plus de colonne, il est dans l'étiquette de la barre (« Lecture · 1:48 »). Pendant le travail, au survol de la barre (toute la barre : une image ne réagit pas au survol d'une seule partie), une étiquette avec le temps se pose pile sur la sienne : `svgEtiquetteSurvol`, une image transparente de la taille de la barre, révélée par `hover: { display: 'flex' }` sur une `Box` en `position: absolute` ; seule cette petite image change chaque seconde. Une fois fini, le temps est d'office dans l'étiquette (« ✓ Fini · 3:42 »), le temps que la barre s'efface (5 s). Au terminal, seulement à 100 %.
 
 ### 9.2 Les sous-agents
 
@@ -218,12 +221,12 @@ Un outil absent de la liste donne « Action ». À la fin, le curseur affiche «
 - **Écriture.** Chaque session écrit son état dans `~/.claude/pupitre/sessions/<id de session>.json` : titre, avancement, tâche, étape, chrono, date. C'est fait au plus une fois par seconde, et seulement quand quelque chose change.
 - **Lecture.** Chaque session lit les fichiers des autres toutes les 2 s. Elle ignore ceux qui n'ont pas bougé depuis plus de 15 s (session fermée ou au repos) et supprime ceux de plus d'une heure.
 - **Affichage.** Sous « Autres discussions », une ligne fine par session : titre (sinon le nom du dossier du projet), tâche, barre fine (10 px), compteur et chrono.
-- **Fin.** Une discussion vue en cours puis finie garde sa ligne (verte, « Terminé », chrono arrêté), même une fois fermée, jusqu'à sa croix **×**. Fermée, elle ne revient qu'avec une nouvelle demande dans cette discussion. Une discussion disparue en plein travail (plantage) part au bout de 15 s, comme avant.
+- **Fin.** Une discussion vue en cours puis finie garde sa ligne (verte, « Terminé », chrono arrêté), même une fois fermée, jusqu'à sa croix **×**, et au plus 5 s après sa fin (1.0.5). Fermée, elle ne revient qu'avec une nouvelle demande dans cette discussion. Une discussion disparue en plein travail (plantage) part au bout de 15 s, comme avant.
 - **Plantage.** Un fichier illisible ou à moitié écrit est ignoré : l'écriture passe par un fichier temporaire, ensuite renommé.
 
 ### 9.4 Fin et son
 
-- **Fin.** Quand la réponse se termine, tout passe au vert et reste affiché. Une croix, au bout de la première ligne, retire les barres /fil : `Button` de `label` « × ». Le bureau ne dessine d'un `Button` que son `label` : ni son contenu, ni `role: 'dismiss'` dans cette bande (vérifié sur capture le 11/10/2026). Limite : le moteur n'offre pas de nom accessible distinct du libellé, la croix est donc annoncée « × » ; sinon elles sont remplacées à la demande suivante (demande du 11/10/2026).
+- **Fin.** Quand la réponse se termine, tout passe au vert, puis s'efface 5 s après (1.0.5). Une croix, au bout de la première ligne, retire les barres /fil : `Button` de `label` « × ». Le bureau ne dessine d'un `Button` que son `label` : ni son contenu, ni `role: 'dismiss'` dans cette bande (vérifié sur capture le 11/10/2026). Limite : le moteur n'offre pas de nom accessible distinct du libellé, la croix est donc annoncée « × » ; sinon elles sont remplacées à la demande suivante (demande du 11/10/2026).
 - **Rechargement.** Au démarrage de la session (ou au rechargement du mod), les lignes /fil en cours sont retirées (on ne peut plus les suivre) ; les lignes finies restent, avec leur croix.
 - **Son.** Le carillon `assets/carillon.wav` est joué si la réponse a duré plus de 30 s. C'est un carillon doux de 2 notes (mi puis la, environ 0,6 s, sons sinusoïdaux qui s'atténuent), fabriqué par `outils/carillon.py`. Rien n'est téléchargé. Le moteur ne joue de son que sur macOS : sous Windows, le mod fait lire le fichier par PowerShell (`Media.SoundPlayer`).
 
@@ -264,6 +267,9 @@ Elles remplacent ce qui, plus haut, les contredit.
 
 - **Une ligne par travail (9.1 à 9.3).** Mêmes colonnes partout : icône (● en cours, ✓ fini, ↳ sous-agent), titre (le début de la demande ; pour une autre discussion, « demande · dossier »), barre de 18 px avec l'étape dans une étiquette, pourcentage, temps, croix. La place de la croix est gardée sur chaque ligne : toutes les barres ont la même longueur. Les autres discussions sont dans la même liste, sous celles de cette discussion ; leur fiche porte aussi la demande et le mot d'étape.
 - **Sous-agents.** Un sous-agent fini reste affiché, vert, jusqu'à la croix (plus de départ au bout de 4 s).
+- **Claude attend ta réponse (1.0.5, demande du 12/10/2026, piste A choisie sur aperçu).** De l'appel à `AskUserQuestion` jusqu'à son résultat (`attente` du suivi ; l'étiquette « Question », elle, restait jusqu'à l'outil suivant), la barre passe à l'orange (`PALETTE_APPEL`, l'orange de la jauge), pulse doucement (`.p`, 1,2 s, sur toute la partie remplie), sans étincelles, bande de lumière ni tête de lecture, et ne s'assoupit jamais. L'étiquette dit « Ta réponse ? », l'icône est un « ? » orange. Animations « Coupées » : orange fixe ; Windows « moins d'animations » arrête aussi l'impulsion. L'attente passe dans la fiche des autres fenêtres (`attente`, absente des fiches d'avant : faux).
+- **Autres discussions (1.0.5, demande du 12/10/2026, pistes C et D).** Les autres conversations ont l'icône ⧉ (en cours comme finies ; « ? » quand leur Claude attend), et un titre discret « Autres discussions » les précède dès qu'il y en a une. Pas de trait : la bande ne trace que des cadres entiers.
+- **Barres finies (1.0.5, demande du 12/10/2026, remplace la ligne précédente).** Toute barre finie (Claude, sous-agent, autre discussion) s'efface toute seule 5 s après être passée au vert (`DUREE_FINIE_MS`), comme si on avait cliqué sa croix ; la croix la retire plus tôt. Le tic d'une seconde s'en charge ; une barre en cours ne part jamais.
 - **Cache.** À la fin de chaque réponse, `turn.complete` donne `usage` : « Cache 82 % » (lu dans le cache / entrée totale) s'affiche à gauche de la ligne des boutons quand la jauge est allumée.
 - **/cap automatique.** `/cap` bascule `cap`, comme les autres commandes. Allumé, un `prompt.submit` joint `CONSIGNE_CAP_AUTO` au `context` de chaque message de l'utilisateur (sauf une commande « / ») : à la fin du travail, Claude pose « Et maintenant, on fait quoi ? » avec AskUserQuestion et 3 suites. Vérifié dans le terminal : le contexte d'un message de l'utilisateur arrive à Claude, alors que le prompt système d'un mod (`prompt.compose`, `prompt.context`) n'est pas consulté.
 - **Relais au bon moment.** Réglage `{ seuil, auto }` gardé dans `$.store` (clé `relais`), seuil de 30 à 90 % par pas de 5, 60 % par défaut. À chaque `session.measure`, au-delà du seuil : le bouton devient « Passer le relais · 62 % » et une notification prévient une fois par dépassement ; en automatique, le relais se lance à la fin du tour (jamais au milieu du travail). Le mod suit le tour qui porte la consigne du relais (`turnId`), car la demande d'un mod ne part qu'au repos ; il cherche `relais.md` à la racine du projet (`$.session.root()`).

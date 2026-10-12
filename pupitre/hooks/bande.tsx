@@ -1,5 +1,5 @@
 import type { Animations, Autre, LigneFil, Mesure, Mesures, Niveau, ReglageRelais, Reglages } from '../types'
-import { HAUTEUR_FIL, PALETTES_JAUGE, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
+import { HAUTEUR_FIL, PALETTES_JAUGE, TEXTE_APPEL, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgEtiquetteSurvol, svgFil, svgSimple } from './pixels'
 import { formatPct } from './jauge'
 import { chrono } from './textes'
 import { jaugeVisible, toutAllume, type Commande } from './reglages'
@@ -136,37 +136,48 @@ export function dessinerReglages(T: Elements, surface: string, r: Reglages, a: A
   )
 }
 
-// Une ligne par travail, aux mêmes colonnes partout : icône, titre, barre, %, temps, croix. La place de la croix
+// Une ligne par travail, aux mêmes colonnes partout : icône, titre, barre, %, croix. La place de la croix
 // est gardée sur chaque ligne : toutes les barres ont la même longueur, et les textes restent alignés.
-// Au plus juste : « 100 % », « 12:34 », et la croix (« [ × ] » au terminal) ; le reste va à la barre.
-const COL_ICONE = 2, COL_TITRE = 26, COL_PCT = 5, COL_CHRONO = 6, COL_FERMER = 5
+// Au plus juste : « 100 % » et la croix (« [ × ] » au terminal) ; le reste va à la barre. Le temps n'a plus de colonne :
+// il est dans l'étiquette de la barre, au survol pendant le travail, d'office une fois fini (demande du 12/10/2026).
+const COL_ICONE = 2, COL_TITRE = 26, COL_PCT = 5, COL_FERMER = 5
 
 export function largeurBarre(colonnes: number): number {
-  return Math.max(10, colonnes - COL_ICONE - COL_TITRE - COL_PCT - COL_CHRONO - COL_FERMER - 5)
+  return Math.max(10, colonnes - COL_ICONE - COL_TITRE - COL_PCT - COL_FERMER - 4)
 }
 
 type Rang = {
   cle: string; icone: string; titre: string; secondaire: boolean
   progression: number; avant: number; niveau: Niveau; niveauAvant: Niveau; fini: boolean; eclat: boolean
   mot: string; majLe: number; debut: number; finiLe: number | null
+  attente: boolean // Claude attend ta réponse : « ? » et barre orange qui pulse
   fermer?: { cle: string; action: () => void }
 }
+const MOT_APPEL = 'Ta réponse ?'
 
 function rang(T: Elements, surface: string, colonnes: number, r: Rang, maintenant: number, animations: Animations) {
   const { Box, Text, Svg, Button } = T
   const largeur = largeurBarre(colonnes)
   const w = Math.max(40, Math.round(largeur * PX_COL))
   const pct = `${Math.round((r.fini ? 1 : r.progression) * 100)} %`
-  const barre = surface === 'terminal' || Svg === undefined
-    ? <Text color={TEXTE_NIVEAU[r.niveau]} wrap="truncate">{barreTexte(r.fini ? 1 : r.progression, Math.max(1, largeur - r.mot.length - 1))} {r.mot}</Text>
-    : <Svg key={`b-${r.cle}`} source={svgFil({ largeur: w, progression: r.progression, avant: r.avant, niveau: r.niveau, niveauAvant: r.niveauAvant, fini: r.fini, eclat: r.eclat, mot: r.mot, graine: graineDe(r.cle), majLe: r.majLe, maintenant, animations })} alt={`${r.titre} : ${r.mot}, ${pct}`} width={w} height={HAUTEUR_FIL} />
+  const avecTemps = `${r.mot} · ${chrono((r.finiLe ?? maintenant) - r.debut)}`
+  const mot = r.fini ? avecTemps : r.mot // finie, le temps d'office, le temps qu'elle s'efface
+  const images = surface !== 'terminal' && Svg !== undefined
+  const couleur = r.attente ? TEXTE_APPEL : TEXTE_NIVEAU[r.niveau]
+  const barre = !images
+    ? <Text color={couleur} wrap="truncate">{barreTexte(r.fini ? 1 : r.progression, Math.max(1, largeur - mot.length - 1))} {mot}</Text>
+    : <Svg key={`b-${r.cle}`} source={svgFil({ largeur: w, progression: r.progression, avant: r.avant, niveau: r.niveau, niveauAvant: r.niveauAvant, fini: r.fini, eclat: r.eclat, mot, graine: graineDe(r.cle), majLe: r.majLe, maintenant, animations, attente: r.attente })} alt={`${r.titre} : ${mot}, ${pct}`} width={w} height={HAUTEUR_FIL} />
+  // pendant le travail, au survol de la barre, une étiquette avec le temps se pose pile sur la sienne ; seule cette
+  // petite image change chaque seconde, la barre reste la même (une image ne réagit pas au survol d'une seule partie)
+  const survol = images && !r.fini
+    ? <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}><Svg key={`t-${r.cle}`} source={svgEtiquetteSurvol({ largeur: w, progression: r.progression, niveau: r.niveau, mot: r.mot, texte: avecTemps, attente: r.attente })} alt={`${r.titre} : ${avecTemps}`} width={w} height={HAUTEUR_FIL} /></Box>
+    : null
   return (
     <Box key={`l-${r.cle}`} flexDirection="row" gap={1} alignItems="center">
-      <Box width={COL_ICONE}><Text color={TEXTE_NIVEAU[r.niveau]} wrap="truncate">{r.icone}</Text></Box>
+      <Box width={COL_ICONE}><Text color={couleur} wrap="truncate">{r.icone}</Text></Box>
       <Box width={COL_TITRE}><Text dimColor={r.secondaire} wrap="truncate">{r.titre}</Text></Box>
-      <Box width={largeur}>{barre}</Box>
+      <Box key={`s-${r.cle}`} width={largeur}>{barre}{survol}</Box>
       <Box width={COL_PCT} justifyContent="flex-end"><Text dimColor wrap="truncate">{pct}</Text></Box>
-      <Box width={COL_CHRONO} justifyContent="flex-end"><Text dimColor wrap="truncate">{chrono((r.finiLe ?? maintenant) - r.debut)}</Text></Box>
       {/* croix de fermeture : le bureau ne dessine d'un Button que son label (ni son contenu, ni role « dismiss »
           dans cette bande, vérifié sur capture), donc la croix est le label ; le cadre du bouton garde la zone cliquable. */}
       <Box width={COL_FERMER} justifyContent="flex-end">{r.fermer ? <Button key={r.fermer.cle} label="×" onPress={() => r.fermer!.action()} /> : null}</Box>
@@ -176,9 +187,9 @@ function rang(T: Elements, surface: string, colonnes: number, r: Rang, maintenan
 
 function depuisLigne(l: LigneFil, fermer?: () => void): Rang {
   return {
-    cle: l.id, icone: l.id !== 'claude' ? '↳' : l.fini ? '✓' : '●', titre: l.qui, secondaire: l.id !== 'claude',
+    cle: l.id, icone: l.attente ? '?' : l.id !== 'claude' ? '↳' : l.fini ? '✓' : '●', titre: l.qui, secondaire: l.id !== 'claude',
     progression: l.progression, avant: l.avant, niveau: l.niveau, niveauAvant: l.niveauAvant, fini: l.fini, eclat: l.eclat,
-    mot: l.mot, majLe: l.majLe, debut: l.debut, finiLe: l.finiLe,
+    mot: l.attente ? MOT_APPEL : l.mot, majLe: l.majLe, debut: l.debut, finiLe: l.finiLe, attente: l.attente === true,
     fermer: fermer ? { cle: 'fermer-fil', action: fermer } : undefined,
   }
 }
@@ -196,16 +207,18 @@ export function titreAutre(demande: string, dossier: string): string {
 function depuisAutre(a: Autre, fermer?: (id: string) => void): Rang {
   const fini = a.finiLe !== null
   return {
-    cle: a.id, icone: fini ? '✓' : '●', secondaire: false,
+    // ⧉ : une autre fenêtre, en cours comme finie (la barre verte dit la fin) ; « ? » quand son Claude attend
+    cle: a.id, icone: a.attente ? '?' : '⧉', secondaire: false, attente: a.attente === true,
     titre: titreAutre(a.demande || a.tache || 'Discussion', a.titre),
-    progression: a.progression, avant: a.progression, niveau: a.niveau, niveauAvant: a.niveau, fini, eclat: false,
-    mot: a.mot || (fini ? '✓ Fini' : 'En cours'), majLe: a.majLe, debut: a.debut, finiLe: a.finiLe,
+    // finie, toujours le vert de la fin, même si sa fiche vient d'une version à 4 couleurs (où la fin valait 3)
+    progression: a.progression, avant: a.progression, niveau: fini ? 6 : a.niveau, niveauAvant: fini ? 6 : a.niveau, fini, eclat: false,
+    mot: a.attente ? MOT_APPEL : a.mot || (fini ? '✓ Fini' : 'En cours'), majLe: a.majLe, debut: a.debut, finiLe: a.finiLe,
     fermer: fini && fermer ? { cle: `fermer-${a.id}`, action: () => fermer(a.id) } : undefined,
   }
 }
 
 export function dessinerBande(T: Elements, surface: string, colonnes: number, maxRows: number, s: EtatBande) {
-  const { Box } = T
+  const { Box, Text } = T
   const jauge = jaugeVisible(s.reglages)
   const lignes = s.reglages.fil ? (maxRows < 8 ? s.lignes.filter(l => l.id === 'claude') : s.lignes) : []
   const autres = s.reglages.fil ? s.autres : []
@@ -215,6 +228,8 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   // de haut en bas : cette discussion (Claude, puis ses sous-agents), les autres, la jauge, les boutons, les réglages
   const rangs = [
     ...lignes.map((l, i) => rang(T, surface, colonnes, depuisLigne(l, i === 0 ? fermer : undefined), s.maintenant, s.animations)),
+    // un titre discret sépare les autres conversations de la tienne (la bande ne trace pas de trait seul, rien qu'un cadre)
+    autres.length > 0 ? <Text key="titre-autres" dimColor wrap="truncate">Autres discussions</Text> : null,
     ...autres.map(a => rang(T, surface, colonnes, depuisAutre(a, s.fermerAutre), s.maintenant, s.animations)),
     s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.maintenant, s.animations) : null,
     jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons, s.reglages.jauge ? s.cache : null, s.expliquerCache) : null,

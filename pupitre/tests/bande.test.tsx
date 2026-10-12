@@ -68,7 +68,7 @@ test('chaque barre a sa largeur et sa hauteur fixées (sinon le bureau lui donne
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   const svgs = await ui.findAll({ type: 'Svg' })
-  expect(svgs.length).toBe(4) // 3 mesures + la ligne de Claude
+  expect(svgs.length).toBe(5) // 3 mesures + la ligne de Claude + son étiquette au survol
   for (const s of svgs) {
     expect(typeof s.props.width).toBe('number')
     expect(typeof s.props.height).toBe('number')
@@ -149,7 +149,7 @@ test('/fil au-dessus de la jauge, les boutons en dessous', async ($, on) => {
   await t.unmount()
 })
 
-test('travail fini : la barre reste, avec une croix « Fermer », jusqu à ce qu on la ferme', async ($, on) => {
+test('travail fini : la barre passe au vert avec une croix « Fermer », qui la retire tout de suite', async ($, on) => {
   const horloge = await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
@@ -158,10 +158,12 @@ test('travail fini : la barre reste, avec une croix « Fermer », jusqu à ce qu
   const croix = async () => (await ui.findAll({ type: 'Button' })).filter(b => b.key === 'fermer-fil')
   expect(await croix()).toHaveLength(0) // pas pendant le travail
   await $.turn.complete({ answer: '', durationMs: 5000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
-  await horloge.advance(10_000)
+  await horloge.advance(4_000)
   const avant = JSON.stringify(await ui.drawn())
   expect(avant).toContain('fais ceci') // la demande sert de titre
   expect(avant).toContain('Sous-agent')
+  expect(avant).not.toContain('Autres discussions') // ta conversation seule : pas de titre
+  expect(avant).not.toContain('⧉')
   const [x, ...autresCroix] = await croix()
   expect(autresCroix).toHaveLength(0)
   // Le bureau ne dessine d'un Button que son label (ni son contenu, ni role « dismiss » dans cette bande,
@@ -176,7 +178,7 @@ test('travail fini : la barre reste, avec une croix « Fermer », jusqu à ce qu
   await ui.unmount()
 })
 
-test('autre discussion finie : sa ligne reste, avec sa croix, même une fois l autre discussion fermée', async ($, on) => {
+test('autre discussion finie : sa ligne reste quelques secondes avec sa croix, même l autre discussion fermée, puis s efface', async ($, on) => {
   let fiche = ''
   let ecriteLe = 0
   mock.env(on, { USERPROFILE: 'C:/Users/essai' })
@@ -190,25 +192,41 @@ test('autre discussion finie : sa ligne reste, avec sa croix, même une fois l a
   on('session.usage', async () => ({ value: { context: { window: 200_000 }, rateLimits: [] } }) as never)
   const horloge = await preparer($, on)
   await $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
-  const L: LigneFil = { id: 'claude', qui: 'Claude', tache: 'En cours', mot: 'Lecture', compteur: '≈', progression: 0.3, avant: 0, niveau: 1, niveauAvant: 1, fini: false, eclat: false, debut: horloge.now(), majLe: horloge.now(), finiLe: null }
+  const L: LigneFil = { id: 'claude', qui: 'Claude', tache: 'En cours', mot: 'Lecture', compteur: '≈', progression: 0.3, avant: 0, niveau: 1, niveauAvant: 1, fini: false, eclat: false, attente: false, debut: horloge.now(), majLe: horloge.now(), finiLe: null }
   const poser = (l: LigneFil) => { ecriteLe = horloge.now(); fiche = JSON.stringify(ficheDe('autre', 'Atelier', l, ecriteLe)) }
   poser(L)
   await horloge.advance(2_000)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   const croix = async () => (await ui.findAll({ type: 'Button' })).filter(b => b.key === 'fermer-autre')
-  expect(JSON.stringify(await ui.drawn())).toContain('Atelier')
+  const enCours = JSON.stringify(await ui.drawn())
+  expect(enCours).toContain('Atelier')
+  expect(enCours).toContain('Autres discussions') // le titre, au-dessus des autres conversations
+  expect(enCours).toContain('"⧉"') // et leur icône de fenêtre
   expect(await croix()).toHaveLength(0) // pas pendant le travail
-  poser({ ...L, fini: true, finiLe: horloge.now(), tache: 'Terminé', compteur: '✓', mot: '✓ Fini', progression: 1, niveau: 3 })
+  const finir = () => poser({ ...L, fini: true, finiLe: horloge.now(), tache: 'Terminé', compteur: '✓', mot: '✓ Fini', progression: 1, niveau: 3 })
+  finir()
   await horloge.advance(2_000)
   fiche = '' // l'autre discussion se ferme
-  await horloge.advance(60_000)
+  await horloge.advance(2_000) // 4 s après la fin
   const reste = JSON.stringify(await ui.drawn())
   expect(reste).toContain('Atelier')
   expect(reste).toContain('100 %')
+  expect(reste).toContain('"color":"#2F7A3B"') // une fiche finie d'une version précédente (niveau 3) reste verte
   const [x] = await croix()
   expect(x!.props.label).toBe('×')
   await ui.press({ key: 'fermer-autre' })
   expect(JSON.stringify(await ui.drawn())).not.toContain('Atelier')
+  // une nouvelle demande là-bas : sans clic, sa ligne finie s'efface toute seule 5 s après la fin
+  poser({ ...L, debut: horloge.now() })
+  await horloge.advance(2_000)
+  expect(JSON.stringify(await ui.drawn())).toContain('Atelier')
+  finir()
+  await horloge.advance(4_000)
+  expect(JSON.stringify(await ui.drawn())).toContain('Atelier')
+  await horloge.advance(2_000)
+  const vide = JSON.stringify(await ui.drawn())
+  expect(vide).not.toContain('Atelier')
+  expect(vide).not.toContain('Autres discussions') // plus d'autre conversation : plus de titre
   await ui.unmount()
 })
 
@@ -217,25 +235,61 @@ test('aucune barre en cadre interactif : un cadre se recharge à chaque changeme
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   const svgs = await ui.findAll({ type: 'Svg' })
-  expect(svgs.length).toBe(4)
+  expect(svgs.length).toBe(5) // l'étiquette du survol aussi
   for (const s of svgs) expect(s.props.isInteractive ?? false).toBe(false)
   await ui.unmount()
 })
+
+test('Claude t attend : la barre passe à l orange avec « Ta réponse ? » et un « ? », jusqu à ta réponse', async ($, on) => {
+  let repondre!: () => void
+  const repondu = new Promise<void>(r => { repondre = r })
+  let poser!: () => void
+  const posee = new Promise<void>(r => { poser = r })
+  mock.store(on)
+  mock.clock(on, { now: 1_000_000 })
+  on('tool.call', async ($, e) => { if (e.tool === 'AskUserQuestion') { poser(); await repondu } return { result: { text: 'ok' } } as never })
+  on('turn.start', async () => ({ turnId: 't1' }))
+  on('ui.render', async () => ({ type: 'Text', props: {}, children: ['(bande du moteur)'] }) as never)
+  await $.command.run({ command: 'pupitre', args: '' })
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  const question = $.tool.call({ tool: 'AskUserQuestion', input: { questions: [] } } as never)
+  await posee
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const ui = await $.ui.mount({ plugin: 'pupitre', surface, ...BANDE })
+    const texte = JSON.stringify(await ui.drawn())
+    expect(texte).toContain('Ta réponse ?')
+    expect(texte).toContain('"color":"#D6761E","wrap":"truncate"},"children":["?"]') // l'icône
+    if (surface === 'desktop') expect(texte).toContain('class=\\"p\\"') // l'impulsion
+    await ui.unmount()
+  }
+  repondre()
+  await question
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  expect(JSON.stringify(await ui.drawn())).not.toContain('Ta réponse ?')
+  await ui.unmount()
+})
+
+// L'étiquette du survol se reconnaît à son texte de remplacement : le temps, sans pourcentage (« fais ceci : Lecture · 0:02 »).
+const survol = (s: { props: Record<string, unknown> }) => String(s.props.alt).includes(' · ') && !String(s.props.alt).includes('%')
+// Les images de la bande, sans les étiquettes du survol, qui portent le temps et changent chaque seconde.
+const images = async (ui: { findAll: (q: { type: string }) => Promise<{ key?: string; props: Record<string, unknown> }[]> }) =>
+  (await ui.findAll({ type: 'Svg' })).filter(s => !survol(s))
 
 test('chaque image porte l heure de son dessin, puis garde le même texte tant qu elle ne change pas', async ($, on) => {
   const horloge = await preparer($, on)
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   await horloge.advance(2_500)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
-  const svgs = await ui.findAll({ type: 'Svg' })
+  const svgs = await images(ui)
   expect(svgs.length).toBe(4)
   for (const s of svgs) expect(String(s.props.source)).toContain('--t:-1002.50s')
   await ui.unmount()
-  // une seconde plus tard, la bande est redessinée (le chrono avance) : les images, inchangées, n'ont rien à recharger
+  // une seconde plus tard, la bande est redessinée (le chrono avance) : les images, inchangées, n'ont rien à recharger ;
+  // seule la petite étiquette du survol, qui porte le temps, change
   await horloge.advance(1_000)
   const apres = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   expect(JSON.stringify(await apres.drawn())).toContain('0:03')
-  expect((await apres.findAll({ type: 'Svg' })).map(s => s.props.source)).toEqual(svgs.map(s => s.props.source))
+  expect((await images(apres)).map(s => s.props.source)).toEqual(svgs.map(s => s.props.source))
   await apres.unmount()
 })
 
@@ -280,8 +334,29 @@ test('cap automatique : la consigne part avec chacun de tes messages tant que /c
   expect(recus[2] ?? []).not.toContain(CONSIGNE_CAP_AUTO)
 })
 
-const svgFil = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
-  (await ui.findAll({ type: 'Svg' })).filter(x => !/^(Contexte|Limite)/.test(String(x.props.alt)))
+const svgFil = async (ui: { findAll: (q: { type: string }) => Promise<{ key?: string; props: Record<string, unknown> }[]> }) =>
+  (await images(ui)).filter(x => !/^(Contexte|Limite)/.test(String(x.props.alt)))
+
+test('le temps est dans l étiquette : au survol pendant le travail, d office à 100 %, et plus de colonne à droite', async ($, on) => {
+  const horloge = await preparer($, on)
+  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
+  await horloge.advance(2_000)
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const svgs = await ui.findAll({ type: 'Svg' })
+  expect(String(svgs.find(s => !survol(s) && String(s.props.alt).startsWith('fais ceci'))!.props.source)).not.toContain('0:02')
+  expect(String(svgs.find(s => survol(s))!.props.source)).toContain('Lecture · 0:02')
+  expect(JSON.stringify(await ui.drawn())).toMatch(/"position":"absolute"[^}]*"display":"none"\},"hover":\{"display":"flex"\}/) // posée sur la barre, cachée, révélée au survol
+  expect((await ui.findAll({ type: 'Text' })).some(t => JSON.stringify(t).includes('"0:02"'))).toBe(false) // plus de compteur à droite
+  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  const finies = await ui.findAll({ type: 'Svg' })
+  expect(String(finies.find(s => String(s.props.alt).startsWith('fais ceci'))!.props.source)).toContain('✓ Fini · 0:02')
+  expect(finies.some(s => survol(s))).toBe(false) // à 100 %, plus besoin du survol
+  await ui.unmount()
+  const terminal = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE })
+  expect(JSON.stringify(await terminal.drawn())).toContain('✓ Fini · 0:02')
+  await terminal.unmount()
+})
 
 test('une ligne par travail : la demande en titre, le pourcentage, et toutes les barres de la même largeur', async ($, on) => {
   await preparer($, on)
@@ -344,14 +419,27 @@ test('« Effacer les barres finies » : dès 2 barres finies, retire les vertes 
   await ui.unmount()
 })
 
-test('un sous-agent fini reste affiché jusqu à la croix, même pendant que Claude travaille', async ($, on) => {
-  const horloge = await preparer($, on)
+test('une barre finie s efface toute seule 5 s après être passée au vert, même un sous-agent pendant que Claude travaille', async ($, on) => {
+  const { horloge } = await demarrer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
   await $.tool.call({ tool: 'Read', input: { file_path: 'a.md' }, agentId: 'a1' } as never)
   await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', agentId: 'a1' } as never)
-  await horloge.advance(10_000)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await horloge.advance(4_000)
   expect(JSON.stringify(await ui.drawn())).toContain('Sous-agent')
+  await horloge.advance(2_000)
+  let texte = JSON.stringify(await ui.drawn())
+  expect(texte).not.toContain('Sous-agent')
+  expect(texte).toContain('fais ceci') // Claude travaille encore : sa barre en cours reste
+  await horloge.advance(60_000)
+  expect(JSON.stringify(await ui.drawn())).toContain('fais ceci') // une barre en cours ne part jamais
+  await $.turn.complete({ answer: '', durationMs: 5000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  await horloge.advance(4_000)
+  expect(JSON.stringify(await ui.drawn())).toContain('fais ceci')
+  await horloge.advance(2_000)
+  texte = JSON.stringify(await ui.drawn())
+  expect(texte).not.toContain('fais ceci')
+  expect(texte).toContain('Contexte') // la jauge reste
   await ui.unmount()
 })
 
@@ -590,10 +678,13 @@ const BOUCLES = /class="(e|r|v|c|h\d)"/ // étincelles, bande de lumière, pixel
 const sources = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
   (await ui.findAll({ type: 'Svg' })).map(s => String(s.props.source))
 
-// Une session qui démarre avec, sur le disque, ce que `store` contient ; rend de quoi en démarrer une autre.
+// Une session qui démarre avec, sur le disque, ce que `store` contient ; rend son horloge, et de quoi en démarrer une autre.
 async function demarrer($: any, on: any, store: Record<string, unknown> = {}) {
   mock.store(on, store)
-  mock.clock(on, { now: 1_000_000 })
+  const horloge = mock.clock(on, { now: 1_000_000 })
+  on('tool.call', async () => ({ result: { text: 'contenu' } }) as never)
+  on('turn.start', async () => ({ turnId: 't1' }))
+  on('turn.complete', async () => ({ text: '' }))
   mock.env(on, { USERPROFILE: 'C:/Users/essai' })
   on('session.start', async (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('command.register', async () => ({ value: undefined }) as never)
@@ -602,13 +693,13 @@ async function demarrer($: any, on: any, store: Record<string, unknown> = {}) {
   // contexte à 40 % : une jauge remplie, où passe la bande de lumière
   on('session.usage', async () => ({ value: { context: { window: 200_000, tokens: 80_000 }, rateLimits: [] } }) as never)
   on('ui.render', async () => ({ type: 'Text', props: {}, children: ['(bande du moteur)'] }) as never)
-  const lancer = () => $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
-  await lancer()
-  return lancer
+  const relancer = () => $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
+  await relancer()
+  return { horloge, relancer }
 }
 
 test('« Animations » réduites : les jauges ne tournent plus en boucle, et le choix est gardé pour la session suivante', async ($, on) => {
-  const relancer = await demarrer($, on)
+  const { relancer } = await demarrer($, on)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   expect((await sources(ui)).some(s => BOUCLES.test(s))).toBe(true)
   await ui.press({ key: 'reglages' })

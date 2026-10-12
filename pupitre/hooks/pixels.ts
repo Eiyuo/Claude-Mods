@@ -1,11 +1,15 @@
 import type { Animations, Niveau } from '../types'
 export type { Niveau } from '../types'
 
+// Spectre (choisi sur prototype le 12/10/2026) : six étapes pendant le remplissage, une tous les sixièmes, puis le vert de la fin.
 export const PALETTES_FIL: readonly (readonly string[])[] = [
-  ['#B2A6EE', '#9687E4', '#7C6CDC', '#6452D0'],
-  ['#84A8EC', '#6490E6', '#4678DC', '#2C60C8'],
-  ['#5CC4BC', '#38B2AA', '#1E9C96', '#10827C'],
-  ['#7CC280', '#58B060', '#3C9C48', '#288037'],
+  ['#B2A6EE', '#9687E4', '#7C6CDC', '#6452D0'], // violet
+  ['#A3ADF0', '#8590E6', '#6875D8', '#4F5BC4'], // indigo
+  ['#84A8EC', '#6490E6', '#4678DC', '#2C60C8'], // bleu
+  ['#7FD0E8', '#5BBCDB', '#3AA6CA', '#2489B0'], // cyan
+  ['#5CC4BC', '#38B2AA', '#1E9C96', '#10827C'], // turquoise
+  ['#A9D67E', '#8CC45C', '#70AF42', '#579330'], // vert clair
+  ['#7CC280', '#58B060', '#3C9C48', '#288037'], // vert : fini
 ]
 export const PALETTES_JAUGE = {
   vert: ['#7CC280', '#58B060', '#3C9C48', '#288037'],
@@ -13,17 +17,18 @@ export const PALETTES_JAUGE = {
   orange:['#F5AA5F', '#EE9646', '#E8862A', '#D6761E'],
   rouge: ['#E66E6E', '#DE5A5A', '#D64545', '#C43737'],
 } as const
-export const TEXTE_NIVEAU: readonly string[] = ['#5B4BC4', '#2C5FC0', '#0F7C76', '#2F7A3B']
+// Claude attend ta réponse (demande du 12/10/2026, piste A) : la barre passe à l'orange et pulse doucement.
+export const PALETTE_APPEL = PALETTES_JAUGE.orange
+export const TEXTE_APPEL = PALETTE_APPEL[3]
+export const TEXTE_NIVEAU: readonly string[] = ['#5B4BC4', '#4350B5', '#2C5FC0', '#1C7A9E', '#0F7C76', '#4C7F25', '#2F7A3B']
 
 const B4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]] as const
 const PAS = 60 // vague de couleur : 60 tranches de gauche à droite, 15 ms d'écart (0,9 s sur toute la barre)
 const EPS = 1e-6
 
 export function niveauDe(progression: number, fini: boolean): Niveau {
-  if (fini) return 3
-  if (progression < 1 / 3 - EPS) return 0
-  if (progression < 2 / 3 - EPS) return 1
-  return 2
+  if (fini) return 6
+  return Math.min(5, Math.max(0, Math.floor(progression * 6 + EPS))) as Niveau
 }
 
 export function couleurJauge(pct: number): keyof typeof PALETTES_JAUGE {
@@ -87,7 +92,7 @@ function teinte(palette: readonly string[], t: number, fini: boolean, i: number,
 const CSS_COMMUN = (maintenant: number, majLe: number) => `svg{--t:${(-maintenant / 1000).toFixed(2)}s;--u:${((majLe - maintenant) / 1000).toFixed(2)}s}
 .e{opacity:0;animation:etincelle 1.6s ease-in-out infinite}
 @keyframes etincelle{0%,35%,65%,100%{opacity:0}50%{opacity:.85}}
-@media (prefers-reduced-motion: reduce){.r,.e,.g,.k,.pop,.a0,.a1,.a2,.a3,.a4,.a5,.h0,.h1,.h2,.h3,.h4,.h5,.v,.c,.z,${RANGS(PAS).map(i => `.w${i}`).join(',')}{animation:none}.e,.r,.g,.b0,.b1,.b2,.b3,.b4,.b5{display:none}}`
+@media (prefers-reduced-motion: reduce){.r,.e,.g,.k,.pop,.p,.a0,.a1,.a2,.a3,.a4,.a5,.h0,.h1,.h2,.h3,.h4,.h5,.v,.c,.z,${RANGS(PAS).map(i => `.w${i}`).join(',')}{animation:none}.e,.r,.g,.b0,.b1,.b2,.b3,.b4,.b5{display:none}}`
 
 // Éclat : une bande de lumière douce (40 % au centre), sur toute la hauteur, balaie la partie remplie colonne par
 // colonne (une toutes les 18 ms), puis marque une pause avant de repartir (cycle de 2,6 s au moins).
@@ -108,6 +113,7 @@ export type OptionsFil = {
   largeur: number; progression: number; avant: number; niveau: Niveau; niveauAvant: Niveau
   fini: boolean; eclat: boolean; mot: string; graine: number; majLe: number; maintenant: number
   animations?: Animations // absent : complètes
+  attente?: boolean // Claude attend ta réponse : orange, une impulsion, ni autres boucles ni assoupissement
 }
 
 // Réduites ou coupées, les boucles (étincelles, bande de lumière, tête de lecture, respiration, battement) ne sont pas
@@ -118,7 +124,7 @@ const retard = (ms: number) => `animation-delay:calc(var(--u) + ${ms}ms)`
 const RANGS = (n: number) => Array.from({ length: n }, (_, i) => i)
 export const HAUTEUR_FIL = 18 // une ligne de texte : la barre tient sur la ligne de son titre
 const ATTENTE_MS = 20_000 // rien de changé depuis ce temps (outil, étape, %) : la barre s'assoupit
-const assoupie = (o: OptionsFil) => !o.fini && o.maintenant - o.majLe >= ATTENTE_MS
+const assoupie = (o: OptionsFil) => !o.fini && !o.attente && o.maintenant - o.majLe >= ATTENTE_MS
 
 // Le chrono redessine la bande chaque seconde : une image qui n'a pas changé rend le même texte, sans être recalculée,
 // et le bureau n'a rien à recharger. L'heure n'entre pas dans la clé : --t et --u restent ceux de son premier dessin.
@@ -134,16 +140,36 @@ function memoise(cle: string, dessiner: () => string): string {
   return s
 }
 
+// L'étiquette (le curseur) : sa largeur suit son texte ; elle se cale juste derrière le bord de la partie remplie.
+const largeurEtiquette = (texte: string) => Math.round(Array.from(texte).length * 5.6) + 10
+const positionEtiquette = (W: number, fin: number, cw: number) => Math.max(3, Math.min(W - cw - 3, fin - cw - 3))
+
+// L'étiquette seule, dans une image transparente de la taille de la barre : posée sur la barre au survol, elle recouvre
+// exactement celle du dessous et y ajoute le temps (« Lecture · 1:48 »). Plus longue, elle recule au besoin vers la
+// gauche pour ne pas déborder, sans découvrir celle du dessous ; opaque, pour que le mot du dessous ne transparaisse pas.
+export function svgEtiquetteSurvol(o: { largeur: number; progression: number; niveau: Niveau; mot: string; texte: string; attente?: boolean }): string {
+  const W = Math.max(40, Math.round(o.largeur))
+  const fin = Math.round(Math.max(0, Math.min(1, o.progression)) * W)
+  const cwMot = largeurEtiquette(o.mot)
+  const xMot = positionEtiquette(W, fin, cwMot)
+  const cw = largeurEtiquette(o.texte)
+  const x = Math.min(xMot, Math.max(3, W - cw - 3))
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${HAUTEUR_FIL}" viewBox="0 0 ${W} ${HAUTEUR_FIL}">` +
+    `<g transform="translate(${x})"><rect y="3" width="${Math.max(cw, xMot + cwMot - x)}" height="12" rx="3" fill="${o.attente ? TEXTE_APPEL : PALETTES_FIL[o.niveau]![3]}" stroke="rgba(255,255,255,.3)" stroke-width=".5"/>` +
+    `<text x="5" y="9.5" dominant-baseline="middle" fill="#FFFFFF" font-size="10" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${echapper(o.texte)}</text></g></svg>`
+}
+
 function dessinerFil(o: OptionsFil, c: number): string {
   const W = Math.max(40, Math.round(o.largeur))
   const H = HAUTEUR_FIL
   const rows = 6
-  const pal = PALETTES_FIL[o.niveau]!
+  const pal = o.attente ? PALETTE_APPEL : PALETTES_FIL[o.niveau]!
   const palAvant = PALETTES_FIL[o.niveauAvant]!
   const fin = o.fini ? W : Math.round(Math.max(0, Math.min(1, o.progression)) * W)
   const finAvant = Math.round(Math.max(0, Math.min(1, o.avant)) * W)
   const endormie = assoupie(o)
-  const boucles = enBoucle(o.animations)
+  const boucles = enBoucle(o.animations) && !o.attente // l'appel reste seul à bouger, pour qu'on le remarque
+  const appel = o.attente === true && o.animations !== 'coupees'
   const fond = new Groupes()
   const sur = new Groupes()
   const eclair = new Groupes()
@@ -166,9 +192,9 @@ function dessinerFil(o: OptionsFil, c: number): string {
     if (o.eclat && j === 0) eclair.case('#FFFFFF', `w${pas}`, x, 0, w, H)
     if (boucles && !endormie && bruit(k * 7 + 3, o.graine) < 0.018) etincelles += `<rect class="e" x="${x}" y="${j * c}" width="${w}" height="${c}" fill="#FFFFFF" style="animation-delay:calc(var(--t) - ${(b * 1.6).toFixed(2)}s)"/>`
   }
-  const cw = Math.round(Array.from(o.mot).length * 5.6) + 10
-  const kx = Math.max(3, Math.min(W - cw - 3, fin - cw - 3))
-  const kxAvant = Math.max(3, Math.min(W - cw - 3, finAvant - cw - 3))
+  const cw = largeurEtiquette(o.mot)
+  const kx = positionEtiquette(W, fin, cw)
+  const kxAvant = positionEtiquette(W, finAvant, cw)
   const glisse = kxAvant !== kx ? `animation:glisse .5s cubic-bezier(.34,1.56,.64,1) both;${retard(0)};` : ''
   // Tête de lecture : quelques pixels se détachent du bord vers la droite, tant que ça travaille.
   let fuite = ''
@@ -197,14 +223,17 @@ ${RANGS(6).map(j => `.h${j}{animation:clignote .9s ease-in-out infinite;animatio
 @keyframes clignote{0%,100%{opacity:1}50%{opacity:.2}}
 .v{opacity:0;animation:fuite 1.3s ease-out infinite}@keyframes fuite{from{transform:none;opacity:.9}to{transform:translateX(22px);opacity:0}}
 .z{opacity:.6}${boucles ? '.z{animation:dort 3.4s ease-in-out infinite;animation-delay:var(--t)}@keyframes dort{0%,100%{opacity:.9}50%{opacity:.4}}' : ''}
+${appel ? '.p{animation:appel 1.2s ease-in-out infinite;animation-delay:var(--t)}@keyframes appel{0%,100%{opacity:1}50%{opacity:.45}}' : ''}
 .k{transform:translateX(${kx}px);${glisse}}@keyframes glisse{from{transform:translateX(${kxAvant}px)}to{transform:translateX(${kx}px)}}
 .pop{transform-origin:${cw / 2}px 9px;animation:pop .5s cubic-bezier(.34,1.56,.64,1);${retard(0)}}@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
 .g{opacity:0;animation:gerbe .9s ease-out forwards}@keyframes gerbe{0%{transform:none;opacity:1}45%{transform:translate(calc(var(--dx) * .55),var(--up));opacity:1}100%{transform:translate(var(--dx),var(--dy));opacity:0}}`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     `<style>${css}</style>` +
     `<defs><clipPath id="p"><rect width="${W}" height="${H}" rx="7"/></clipPath><clipPath id="q"><rect width="${fin}" height="${H}"/></clipPath></defs>` +
-    `<rect width="${W}" height="${H}" rx="7" fill="rgba(128,128,128,.12)" stroke="rgba(128,128,128,.35)" stroke-width=".5"/>` +
-    `<g clip-path="url(#p)" shape-rendering="crispEdges">${endormie ? `<g class="z">${fond.svg()}</g>` : fond.svg()}${sur.svg()}${eclair.svg()}${etincelles}${fuite}<g clip-path="url(#q)">${o.fini || endormie || !boucles ? '' : reflet(fin, H, c)}</g></g>` +
+    // barre entière : en cours, la piste prend une teinte légère de l'étape et son contour ; finie, elle redevient neutre
+    (o.fini ? `<rect width="${W}" height="${H}" rx="7" fill="rgba(128,128,128,.12)" stroke="rgba(128,128,128,.35)" stroke-width=".5"/>`
+      : `<rect width="${W}" height="${H}" rx="7" fill="rgba(${rgb(pal[0]!).join(',')},.2)" stroke="${pal[2]}" stroke-width="1"/>`) +
+    `<g clip-path="url(#p)" shape-rendering="crispEdges"${appel ? ' class="p"' : ''}>${endormie ? `<g class="z">${fond.svg()}</g>` : fond.svg()}${sur.svg()}${eclair.svg()}${etincelles}${fuite}<g clip-path="url(#q)">${o.fini || endormie || !boucles ? '' : reflet(fin, H, c)}</g></g>` +
     gerbe +
     `<g class="k"><g${o.eclat ? ' class="pop"' : ''}><rect y="3" width="${cw}" height="12" rx="3" fill-opacity=".8" fill="${pal[3]}" stroke="rgba(255,255,255,.3)" stroke-width=".5"/>` +
     `<text x="5" y="9.5" dominant-baseline="middle" fill="#FFFFFF" font-size="10" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${echapper(o.mot)}</text></g></g>` +

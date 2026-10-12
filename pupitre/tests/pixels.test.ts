@@ -1,17 +1,21 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PALETTES_FIL, barreTexte, couleurJauge, echapper, graineDe, niveauDe, svgFil, svgSimple } from '../hooks/pixels'
+import { PALETTES_FIL, PALETTES_JAUGE, barreTexte, couleurJauge, echapper, graineDe, niveauDe, svgEtiquetteSurvol, svgFil, svgSimple } from '../hooks/pixels'
 
 const BASE = { largeur: 600, progression: 0.5, avant: 0.5, niveau: 1 as const, niveauAvant: 1 as const, fini: false, eclat: false, mot: 'Lecture', graine: 3, majLe: 1000, maintenant: 1000 }
 
 describe('niveaux et couleurs', () => {
-  test('1/3 et 2/3 exacts donnent le niveau supérieur, une seule fois', async () => {
+  test('six étapes (Spectre) : un sixième exact donne l étape suivante, une seule fois ; fini, le vert', async () => {
     expect(niveauDe(0, false)).toBe(0)
-    expect(niveauDe(1 / 3, false)).toBe(1)
-    expect(niveauDe(1 / 3 - 0.001, false)).toBe(0)
-    expect(niveauDe(2 / 3, false)).toBe(2)
-    expect(niveauDe(0.99, false)).toBe(2)
-    expect(niveauDe(1, true)).toBe(3)
-    expect(niveauDe(0.2, true)).toBe(3)
+    expect(niveauDe(1 / 6 - 0.001, false)).toBe(0)
+    expect(niveauDe(1 / 6, false)).toBe(1)
+    expect(niveauDe(1 / 3, false)).toBe(2)
+    expect(niveauDe(0.5, false)).toBe(3)
+    expect(niveauDe(2 / 3, false)).toBe(4)
+    expect(niveauDe(5 / 6, false)).toBe(5)
+    expect(niveauDe(0.99, false)).toBe(5)
+    expect(niveauDe(1, true)).toBe(6)
+    expect(niveauDe(0.2, true)).toBe(6)
+    expect(PALETTES_FIL).toHaveLength(7) // violet, indigo, bleu, cyan, turquoise, vert clair, puis le vert de la fin
   })
   test('seuils de la jauge', async () => {
     expect(couleurJauge(0)).toBe('vert')
@@ -33,9 +37,25 @@ describe('svgFil', () => {
     expect(s).toContain('>Lecture<')
   })
   test('fini : couleurs vertes', async () => {
-    const s = svgFil({ ...BASE, progression: 1, avant: 1, niveau: 3, niveauAvant: 3, fini: true, mot: '✓ Fini' })
-    expect(s).toContain(PALETTES_FIL[3]![3]!)
+    const s = svgFil({ ...BASE, progression: 1, avant: 1, niveau: 6, niveauAvant: 6, fini: true, mot: '✓ Fini' })
+    expect(s).toContain(PALETTES_FIL[6]![3]!)
     expect(s).not.toContain(PALETTES_FIL[1]![3]!)
+  })
+  test('barre entière : en cours, la piste prend une teinte légère de l étape et son contour ; finie, elle redevient neutre', async () => {
+    expect(svgFil(BASE)).toContain(`stroke="${PALETTES_FIL[1]![2]!}"`)
+    expect(svgFil({ ...BASE, progression: 1, avant: 1, niveau: 6, niveauAvant: 6, fini: true, mot: '✓ Fini' })).toContain('stroke="rgba(128,128,128,.35)"')
+  })
+  test('l étiquette du survol : seule, transparente, à la taille de la barre, et elle recouvre celle du dessous', async () => {
+    const s = svgEtiquetteSurvol({ largeur: 600, progression: 0.5, niveau: 1, mot: 'Lecture', texte: 'Lecture · 1:48' })
+    expect(s).toContain('width="600" height="18"')
+    expect(s).toContain('>Lecture · 1:48<')
+    expect(s).not.toContain('clip-path') // ni piste ni pixels : rien que l'étiquette
+    expect(s).toContain(`fill="${PALETTES_FIL[1]![3]!}"`)
+    expect(s).not.toContain('fill-opacity') // opaque : le mot du dessous ne transparaît pas
+    // au bout de la barre, l'étiquette plus longue recule pour ne pas déborder
+    expect(svgEtiquetteSurvol({ largeur: 600, progression: 0.99, niveau: 5, mot: 'Lecture', texte: 'Lecture · 12:48' })).toMatch(/translate\((\d+)\)/)
+    const x = Number(/translate\((\d+)\)/.exec(svgEtiquetteSurvol({ largeur: 600, progression: 0.99, niveau: 5, mot: 'Lecture', texte: 'Lecture · 12:48' }))![1])
+    expect(x + Math.round(Array.from('Lecture · 12:48').length * 5.6) + 10).toBeLessThanOrEqual(597)
   })
   test('échappe le texte du curseur', async () => {
     const s = svgFil({ ...BASE, mot: 'a<b & "c"' })
@@ -52,7 +72,7 @@ describe('svgFil', () => {
   })
   test('reste sous 125 000 caractères même très large, avec fondu et éclat', async () => {
     for (const largeur of [300, 900, 1600, 2600]) {
-      const s = svgFil({ ...BASE, largeur, progression: 1, avant: 0, niveau: 3, niveauAvant: 2, fini: true, eclat: true })
+      const s = svgFil({ ...BASE, largeur, progression: 1, avant: 0, niveau: 6, niveauAvant: 5, fini: true, eclat: true })
       expect(s.length).toBeLessThan(125000)
     }
   })
@@ -64,7 +84,7 @@ describe('svgFil', () => {
     expect(svgFil(BASE)).toContain('prefers-reduced-motion')
   })
   test('redessinée, l image reprend ses animations où elles en étaient, sans revenir en arrière', async () => {
-    for (const o of [{ ...BASE, avant: 0.2 }, { ...BASE, progression: 1, avant: 0.6, niveau: 3 as const, niveauAvant: 2 as const, fini: true, eclat: true }]) {
+    for (const o of [{ ...BASE, avant: 0.2 }, { ...BASE, progression: 1, avant: 0.6, niveau: 6 as const, niveauAvant: 5 as const, fini: true, eclat: true }]) {
       const s = svgFil({ ...o, majLe: 10_000, maintenant: 11_000 })
       expect(s).toContain('--t:-11.00s') // boucles (reflet, respiration, étincelles) : calées sur l'heure du dessin
       expect(s).toContain('--u:-1.00s') // effets d'un changement (cases neuves, curseur, éclat) : calés sur l'heure du changement
@@ -74,7 +94,7 @@ describe('svgFil', () => {
 })
 
 describe('animations : attente, tête de lecture, vague, fanfare, alerte', () => {
-  const FINI = { ...BASE, progression: 1, avant: 0.6, niveau: 3 as const, niveauAvant: 2 as const, fini: true, eclat: true }
+  const FINI = { ...BASE, progression: 1, avant: 0.6, niveau: 6 as const, niveauAvant: 5 as const, fini: true, eclat: true }
   test('tête de lecture : les pixels colorés du bord clignotent et lâchent des pixels, seulement pendant le travail', async () => {
     expect(svgFil(BASE)).toMatch(/<path class="h0" fill="#(?!FFFFFF)/)
     expect(svgFil(BASE)).toContain('class="v"')
@@ -106,10 +126,34 @@ describe('animations : attente, tête de lecture, vague, fanfare, alerte', () =>
   })
 })
 
+describe('Claude attend ta réponse', () => {
+  const ORANGE = PALETTES_JAUGE.orange
+  test('la barre passe à l orange et pulse, sans les autres boucles', async () => {
+    const s = svgFil({ ...BASE, attente: true, majLe: 4000 })
+    expect(s).toContain(`fill="${ORANGE[3]}"`) // l'étiquette
+    expect(s).toContain(`stroke="${ORANGE[2]}"`) // la piste
+    expect(s).not.toContain(PALETTES_FIL[1]![3]!)
+    expect(s).toContain('class="p"')
+    expect(s).toMatch(/\.p\{animation:appel/)
+    expect(s).not.toMatch(/class="(e|r|v|h\d)"/)
+    expect(s).toMatch(/prefers-reduced-motion: reduce\)\{[^}]*\.p[,{]/) // Windows « moins d'animations » l'arrête aussi
+  })
+  test('elle ne pâlit jamais tant que Claude attend', async () => {
+    expect(svgFil({ ...BASE, attente: true, majLe: 0, maintenant: 60_000 })).not.toContain('class="z"')
+  })
+  test('animations coupées : orange fixe, sans impulsion ; réduites : l impulsion reste', async () => {
+    expect(svgFil({ ...BASE, attente: true, majLe: 5000, animations: 'coupees' })).not.toContain('class="p"')
+    expect(svgFil({ ...BASE, attente: true, majLe: 5000, animations: 'reduites' })).toContain('class="p"')
+  })
+  test('l étiquette du survol passe aussi à l orange', async () => {
+    expect(svgEtiquetteSurvol({ largeur: 600, progression: 0.5, niveau: 1, mot: 'Ta réponse ?', texte: 'Ta réponse ? · 0:42', attente: true })).toContain(`fill="${ORANGE[3]}"`)
+  })
+})
+
 describe('réglage des animations', () => {
   const BOUCLES = /class="(e|r|v|c|h\d)"/ // étincelles, bande de lumière, pixels qui fuient, battement, tête qui clignote
   const TRAVAIL = { ...BASE, avant: 0.2, niveauAvant: 0 as const } // des colonnes neuves et un changement de couleur
-  const FINI = { ...BASE, progression: 1, avant: 0.6, niveau: 3 as const, niveauAvant: 2 as const, fini: true, eclat: true }
+  const FINI = { ...BASE, progression: 1, avant: 0.6, niveau: 6 as const, niveauAvant: 5 as const, fini: true, eclat: true }
   const ALERTE = { largeur: 200, hauteur: 10, cellule: 2, rayon: 4, progression: 0.93, palette: PALETTES_FIL[0]!, graine: 1, maintenant: 0, alerte: true }
   test('complètes (le réglage de départ) : les boucles tournent', async () => {
     expect(svgFil(TRAVAIL)).toMatch(BOUCLES)
