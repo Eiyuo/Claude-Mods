@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { PALETTES_FIL, PALETTES_JAUGE, barreTexte, couleurJauge, echapper, graineDe, niveauDe, svgEtiquetteSurvol, svgFil, svgSimple } from '../hooks/pixels'
+import { PALETTES_FIL, PALETTES_JAUGE, barreTexte, couleurJauge, echapper, graineDe, niveauDe, svgFil, svgSimple } from '../hooks/pixels'
 
 const BASE = { largeur: 600, progression: 0.5, avant: 0.5, niveau: 1 as const, niveauAvant: 1 as const, fini: false, eclat: false, mot: 'Lecture', graine: 3, majLe: 1000, maintenant: 1000 }
 
@@ -45,17 +45,23 @@ describe('svgFil', () => {
     expect(svgFil(BASE)).toContain(`stroke="${PALETTES_FIL[1]![2]!}"`)
     expect(svgFil({ ...BASE, progression: 1, avant: 1, niveau: 6, niveauAvant: 6, fini: true, mot: '✓ Fini' })).toContain('stroke="rgba(128,128,128,.35)"')
   })
-  test('l étiquette du survol : seule, transparente, à la taille de la barre, et elle recouvre celle du dessous', async () => {
-    const s = svgEtiquetteSurvol({ largeur: 600, progression: 0.5, niveau: 1, mot: 'Lecture', texte: 'Lecture · 1:48' })
-    expect(s).toContain('width="600" height="18"')
-    expect(s).toContain('>Lecture · 1:48<')
-    expect(s).not.toContain('clip-path') // ni piste ni pixels : rien que l'étiquette
-    expect(s).toContain(`fill="${PALETTES_FIL[1]![3]!}"`)
-    expect(s).not.toContain('fill-opacity') // opaque : le mot du dessous ne transparaît pas
-    // au bout de la barre, l'étiquette plus longue recule pour ne pas déborder
-    expect(svgEtiquetteSurvol({ largeur: 600, progression: 0.99, niveau: 5, mot: 'Lecture', texte: 'Lecture · 12:48' })).toMatch(/translate\((\d+)\)/)
-    const x = Number(/translate\((\d+)\)/.exec(svgEtiquetteSurvol({ largeur: 600, progression: 0.99, niveau: 5, mot: 'Lecture', texte: 'Lecture · 12:48' }))![1])
-    expect(x + Math.round(Array.from('Lecture · 12:48').length * 5.6) + 10).toBeLessThanOrEqual(597)
+  test('le temps tourne tout seul dans l étiquette : des colonnes de chiffres calées sur le début du travail', async () => {
+    const o = { ...BASE, majLe: 100_000, maintenant: 100_000, depuis: 65_000 } // 35 s de travail
+    const s = svgFil(o)
+    expect(s).toContain('>Lecture ·<')
+    expect(s.match(/class="roule(6|10)"/g)).toHaveLength(3) // M:SS
+    expect(s).toContain('animation-delay:calc(var(--t) + 65.00s)')
+    expect(svgFil({ ...o, maintenant: 101_000 })).toBe(s) // une seconde plus tard : la même image, qui a tourné seule
+  })
+  test('à 10 min et à 1 h, une colonne de plus (l image est redessinée à ce moment-là)', async () => {
+    const colonnes = (ecoule: number) => svgFil({ ...BASE, majLe: 0, maintenant: ecoule * 1000, depuis: 0, avant: 0.3 }).match(/class="roule(6|10)"/g)!.length
+    expect(colonnes(599)).toBe(3)
+    expect(colonnes(600)).toBe(4)
+    expect(colonnes(3600)).toBe(5)
+  })
+  test('fini ou animations coupées : pas de temps qui tourne', async () => {
+    expect(svgFil({ ...BASE, progression: 1, avant: 1, niveau: 6, niveauAvant: 6, fini: true, mot: '✓ Fini · 0:35', depuis: 0 })).not.toContain('roule')
+    expect(svgFil({ ...BASE, majLe: 2000, maintenant: 2000, depuis: 0, animations: 'coupees' })).not.toContain('roule')
   })
   test('échappe le texte du curseur', async () => {
     const s = svgFil({ ...BASE, mot: 'a<b & "c"' })
@@ -145,8 +151,10 @@ describe('Claude attend ta réponse', () => {
     expect(svgFil({ ...BASE, attente: true, majLe: 5000, animations: 'coupees' })).not.toContain('class="p"')
     expect(svgFil({ ...BASE, attente: true, majLe: 5000, animations: 'reduites' })).toContain('class="p"')
   })
-  test('l étiquette du survol passe aussi à l orange', async () => {
-    expect(svgEtiquetteSurvol({ largeur: 600, progression: 0.5, niveau: 1, mot: 'Ta réponse ?', texte: 'Ta réponse ? · 0:42', attente: true })).toContain(`fill="${ORANGE[3]}"`)
+  test('le temps tourne aussi pendant la question, dans l étiquette orange', async () => {
+    const s = svgFil({ ...BASE, attente: true, mot: 'Ta réponse ?', majLe: 6000, maintenant: 6000, depuis: 0 })
+    expect(s).toContain('>Ta réponse ? ·<')
+    expect(s).toContain('class="roule10"')
   })
 })
 

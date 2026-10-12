@@ -1,5 +1,5 @@
 import type { Animations, Autre, LigneFil, Mesure, Mesures, Niveau, ReglageRelais, Reglages } from '../types'
-import { HAUTEUR_FIL, PALETTES_JAUGE, TEXTE_APPEL, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgEtiquetteSurvol, svgFil, svgSimple } from './pixels'
+import { HAUTEUR_FIL, PALETTES_JAUGE, TEXTE_APPEL, TEXTE_NIVEAU, barreTexte, couleurJauge, graineDe, svgFil, svgSimple } from './pixels'
 import { formatPct } from './jauge'
 import { chrono } from './textes'
 import { jaugeVisible, toutAllume, type Commande } from './reglages'
@@ -139,7 +139,7 @@ export function dessinerReglages(T: Elements, surface: string, r: Reglages, a: A
 // Une ligne par travail, aux mêmes colonnes partout : icône, titre, barre, %, croix. La place de la croix
 // est gardée sur chaque ligne : toutes les barres ont la même longueur, et les textes restent alignés.
 // Au plus juste : « 100 % » et la croix (« [ × ] » au terminal) ; le reste va à la barre. Le temps n'a plus de colonne :
-// il est dans l'étiquette de la barre, au survol pendant le travail, d'office une fois fini (demande du 12/10/2026).
+// il est dans l'étiquette de la barre (demande du 12/10/2026).
 const COL_ICONE = 2, COL_TITRE = 26, COL_PCT = 5, COL_FERMER = 5
 
 export function largeurBarre(colonnes: number): number {
@@ -160,23 +160,19 @@ function rang(T: Elements, surface: string, colonnes: number, r: Rang, maintenan
   const largeur = largeurBarre(colonnes)
   const w = Math.max(40, Math.round(largeur * PX_COL))
   const pct = `${Math.round((r.fini ? 1 : r.progression) * 100)} %`
+  // le temps est dans l'étiquette : il tourne tout seul dans l'image pendant le travail, s'arrête une fois fini
   const avecTemps = `${r.mot} · ${chrono((r.finiLe ?? maintenant) - r.debut)}`
-  const mot = r.fini ? avecTemps : r.mot // finie, le temps d'office, le temps qu'elle s'efface
   const images = surface !== 'terminal' && Svg !== undefined
   const couleur = r.attente ? TEXTE_APPEL : TEXTE_NIVEAU[r.niveau]
+  const mot = r.fini ? avecTemps : r.mot
   const barre = !images
-    ? <Text color={couleur} wrap="truncate">{barreTexte(r.fini ? 1 : r.progression, Math.max(1, largeur - mot.length - 1))} {mot}</Text>
-    : <Svg key={`b-${r.cle}`} source={svgFil({ largeur: w, progression: r.progression, avant: r.avant, niveau: r.niveau, niveauAvant: r.niveauAvant, fini: r.fini, eclat: r.eclat, mot, graine: graineDe(r.cle), majLe: r.majLe, maintenant, animations, attente: r.attente })} alt={`${r.titre} : ${mot}, ${pct}`} width={w} height={HAUTEUR_FIL} />
-  // pendant le travail, au survol de la barre, une étiquette avec le temps se pose pile sur la sienne ; seule cette
-  // petite image change chaque seconde, la barre reste la même (une image ne réagit pas au survol d'une seule partie)
-  const survol = images && !r.fini
-    ? <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}><Svg key={`t-${r.cle}`} source={svgEtiquetteSurvol({ largeur: w, progression: r.progression, niveau: r.niveau, mot: r.mot, texte: avecTemps, attente: r.attente })} alt={`${r.titre} : ${avecTemps}`} width={w} height={HAUTEUR_FIL} /></Box>
-    : null
+    ? <Text color={couleur} wrap="truncate">{barreTexte(r.fini ? 1 : r.progression, Math.max(1, largeur - avecTemps.length - 1))} {avecTemps}</Text>
+    : <Svg key={`b-${r.cle}`} source={svgFil({ largeur: w, progression: r.progression, avant: r.avant, niveau: r.niveau, niveauAvant: r.niveauAvant, fini: r.fini, eclat: r.eclat, mot, graine: graineDe(r.cle), majLe: r.majLe, maintenant, animations, attente: r.attente, depuis: r.fini ? undefined : r.debut })} alt={`${r.titre} : ${mot}, ${pct}`} width={w} height={HAUTEUR_FIL} />
   return (
     <Box key={`l-${r.cle}`} flexDirection="row" gap={1} alignItems="center">
       <Box width={COL_ICONE}><Text color={couleur} wrap="truncate">{r.icone}</Text></Box>
       <Box width={COL_TITRE}><Text dimColor={r.secondaire} wrap="truncate">{r.titre}</Text></Box>
-      <Box key={`s-${r.cle}`} width={largeur}>{barre}{survol}</Box>
+      <Box width={largeur}>{barre}</Box>
       <Box width={COL_PCT} justifyContent="flex-end"><Text dimColor wrap="truncate">{pct}</Text></Box>
       {/* croix de fermeture : le bureau ne dessine d'un Button que son label (ni son contenu, ni role « dismiss »
           dans cette bande, vérifié sur capture), donc la croix est le label ; le cadre du bouton garde la zone cliquable. */}

@@ -266,6 +266,8 @@ export const register: Register = on => {
         await effacerVieillesFinies($, await $.clock.now())
         const lignes = await read($, lignesA)
         if (lignes.some(l => !l.fini)) await majLignes($)
+        // une autre fenêtre travaille : redessiner aussi, pour que son temps gagne sa colonne à 10 min et à 1 h
+        else if ((await read($, autresA)).some(a => a.finiLe === null)) { const maintenant = await $.clock.now(); await update($, maintenantA, () => maintenant) }
       })()
     })
 

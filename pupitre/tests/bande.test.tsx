@@ -68,7 +68,7 @@ test('chaque barre a sa largeur et sa hauteur fixées (sinon le bureau lui donne
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   const svgs = await ui.findAll({ type: 'Svg' })
-  expect(svgs.length).toBe(5) // 3 mesures + la ligne de Claude + son étiquette au survol
+  expect(svgs.length).toBe(4) // 3 mesures + la ligne de Claude
   for (const s of svgs) {
     expect(typeof s.props.width).toBe('number')
     expect(typeof s.props.height).toBe('number')
@@ -235,7 +235,7 @@ test('aucune barre en cadre interactif : un cadre se recharge à chaque changeme
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
   const svgs = await ui.findAll({ type: 'Svg' })
-  expect(svgs.length).toBe(5) // l'étiquette du survol aussi
+  expect(svgs.length).toBe(4)
   for (const s of svgs) expect(s.props.isInteractive ?? false).toBe(false)
   await ui.unmount()
 })
@@ -269,11 +269,7 @@ test('Claude t attend : la barre passe à l orange avec « Ta réponse ? » et u
   await ui.unmount()
 })
 
-// L'étiquette du survol se reconnaît à son texte de remplacement : le temps, sans pourcentage (« fais ceci : Lecture · 0:02 »).
-const survol = (s: { props: Record<string, unknown> }) => String(s.props.alt).includes(' · ') && !String(s.props.alt).includes('%')
-// Les images de la bande, sans les étiquettes du survol, qui portent le temps et changent chaque seconde.
-const images = async (ui: { findAll: (q: { type: string }) => Promise<{ key?: string; props: Record<string, unknown> }[]> }) =>
-  (await ui.findAll({ type: 'Svg' })).filter(s => !survol(s))
+const images = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) => ui.findAll({ type: 'Svg' })
 
 test('chaque image porte l heure de son dessin, puis garde le même texte tant qu elle ne change pas', async ($, on) => {
   const horloge = await preparer($, on)
@@ -284,11 +280,10 @@ test('chaque image porte l heure de son dessin, puis garde le même texte tant q
   expect(svgs.length).toBe(4)
   for (const s of svgs) expect(String(s.props.source)).toContain('--t:-1002.50s')
   await ui.unmount()
-  // une seconde plus tard, la bande est redessinée (le chrono avance) : les images, inchangées, n'ont rien à recharger ;
-  // seule la petite étiquette du survol, qui porte le temps, change
+  // une seconde plus tard, la bande est redessinée : les images, inchangées, n'ont rien à recharger, et le temps de
+  // l'étiquette a tourné tout seul dedans
   await horloge.advance(1_000)
   const apres = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
-  expect(JSON.stringify(await apres.drawn())).toContain('0:03')
   expect((await images(apres)).map(s => s.props.source)).toEqual(svgs.map(s => s.props.source))
   await apres.unmount()
 })
@@ -337,25 +332,24 @@ test('cap automatique : la consigne part avec chacun de tes messages tant que /c
 const svgFil = async (ui: { findAll: (q: { type: string }) => Promise<{ key?: string; props: Record<string, unknown> }[]> }) =>
   (await images(ui)).filter(x => !/^(Contexte|Limite)/.test(String(x.props.alt)))
 
-test('le temps est dans l étiquette : au survol pendant le travail, d office à 100 %, et plus de colonne à droite', async ($, on) => {
+test('le temps est toujours dans l étiquette : il tourne seul pendant le travail, s arrête à 100 %, plus de colonne à droite', async ($, on) => {
   const horloge = await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
   await $.tool.call({ tool: 'Read', input: { file_path: 'README.md' } })
   await horloge.advance(2_000)
   const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
-  const svgs = await ui.findAll({ type: 'Svg' })
-  expect(String(svgs.find(s => !survol(s) && String(s.props.alt).startsWith('fais ceci'))!.props.source)).not.toContain('0:02')
-  expect(String(svgs.find(s => survol(s))!.props.source)).toContain('Lecture · 0:02')
-  expect(JSON.stringify(await ui.drawn())).toMatch(/"position":"absolute"[^}]*"display":"none"\},"hover":\{"display":"flex"\}/) // posée sur la barre, cachée, révélée au survol
+  const barre = async () => String((await ui.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('fais ceci'))!.props.source)
+  expect(await barre()).toContain('>Lecture ·<')
+  expect(await barre()).toContain('class="roule10"')
+  expect(JSON.stringify(await ui.drawn())).not.toContain('"hover"') // ni bulle ni survol
   expect((await ui.findAll({ type: 'Text' })).some(t => JSON.stringify(t).includes('"0:02"'))).toBe(false) // plus de compteur à droite
-  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
-  const finies = await ui.findAll({ type: 'Svg' })
-  expect(String(finies.find(s => String(s.props.alt).startsWith('fais ceci'))!.props.source)).toContain('✓ Fini · 0:02')
-  expect(finies.some(s => survol(s))).toBe(false) // à 100 %, plus besoin du survol
-  await ui.unmount()
   const terminal = await $.ui.mount({ plugin: 'pupitre', surface: 'terminal', ...BANDE })
-  expect(JSON.stringify(await terminal.drawn())).toContain('✓ Fini · 0:02')
+  expect(JSON.stringify(await terminal.drawn())).toContain('Lecture · 0:02')
   await terminal.unmount()
+  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  expect(await barre()).toContain('✓ Fini · 0:02')
+  expect(await barre()).not.toContain('roule')
+  await ui.unmount()
 })
 
 test('une ligne par travail : la demande en titre, le pourcentage, et toutes les barres de la même largeur', async ($, on) => {

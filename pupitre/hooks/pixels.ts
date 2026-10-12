@@ -114,6 +114,7 @@ export type OptionsFil = {
   fini: boolean; eclat: boolean; mot: string; graine: number; majLe: number; maintenant: number
   animations?: Animations // absent : complètes
   attente?: boolean // Claude attend ta réponse : orange, une impulsion, ni autres boucles ni assoupissement
+  depuis?: number // début du travail : le temps tourne tout seul dans l'étiquette (absent : pas de temps qui tourne)
 }
 
 // Réduites ou coupées, les boucles (étincelles, bande de lumière, tête de lecture, respiration, battement) ne sont pas
@@ -144,20 +145,39 @@ function memoise(cle: string, dessiner: () => string): string {
 const largeurEtiquette = (texte: string) => Math.round(Array.from(texte).length * 5.6) + 10
 const positionEtiquette = (W: number, fin: number, cw: number) => Math.max(3, Math.min(W - cw - 3, fin - cw - 3))
 
-// L'étiquette seule, dans une image transparente de la taille de la barre : posée sur la barre au survol, elle recouvre
-// exactement celle du dessous et y ajoute le temps (« Lecture · 1:48 »). Plus longue, elle recule au besoin vers la
-// gauche pour ne pas déborder, sans découvrir celle du dessous ; opaque, pour que le mot du dessous ne transparaisse pas.
-export function svgEtiquetteSurvol(o: { largeur: number; progression: number; niveau: Niveau; mot: string; texte: string; attente?: boolean }): string {
-  const W = Math.max(40, Math.round(o.largeur))
-  const fin = Math.round(Math.max(0, Math.min(1, o.progression)) * W)
-  const cwMot = largeurEtiquette(o.mot)
-  const xMot = positionEtiquette(W, fin, cwMot)
-  const cw = largeurEtiquette(o.texte)
-  const x = Math.min(xMot, Math.max(3, W - cw - 3))
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${HAUTEUR_FIL}" viewBox="0 0 ${W} ${HAUTEUR_FIL}">` +
-    `<g transform="translate(${x})"><rect y="3" width="${Math.max(cw, xMot + cwMot - x)}" height="12" rx="3" fill="${o.attente ? TEXTE_APPEL : PALETTES_FIL[o.niveau]![3]}" stroke="rgba(255,255,255,.3)" stroke-width=".5"/>` +
-    `<text x="5" y="9.5" dominant-baseline="middle" fill="#FFFFFF" font-size="10" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${echapper(o.texte)}</text></g></svg>`
+// Le temps qui tourne tout seul dans l'étiquette (« Lecture · 0:37 », demande du 12/10/2026) : des colonnes de chiffres
+// qui défilent par crans, calées sur l'horloge, sans redessiner l'image ; au survol, une bulle de l'application cachait
+// la barre (vu sur capture). Les chiffres sont alignés à droite de l'étiquette ; l'image n'est redessinée qu'en passant
+// 10 min puis 1 h, qui ajoutent une colonne.
+const CHIFFRE = 6.4, DEUX_POINTS = 2.6 // mesurés en Segoe UI 10 px semi-gras, chiffres à chasse fixe
+// Largeur du mot, lettre par lettre (mesurée sur aperçu : 5,6 px partout laissait un trou de 10 px) ; le mot est collé
+// au temps, l'écart éventuel de l'estimation part dans la marge de gauche.
+const largeurMot = (texte: string) => Math.ceil(Array.from(texte).reduce((l, c) =>
+  l + (/[iljtfr.,:;·'| ]/.test(c) ? 3 : /[mwMW]/.test(c) ? 8.5 : /[A-ZÀ-Ý]/.test(c) ? 6.6 : 5.5), 0))
+type Colonne = [chiffres: number, periode: number] // periode en s : le temps d'un tour complet de la colonne
+const colonnesTemps = (ecoule: number): Colonne[][] => [
+  [[10, 10], [6, 60]], // secondes, de droite à gauche
+  ecoule >= 600 ? [[10, 600], [6, 3600]] : [[10, 600]], // minutes
+  ...(ecoule >= 3600 ? [[[10, 36_000]] as Colonne[]] : []), // shortcut: au-delà de 10 h les heures repartent à 0 ; rarissime
+]
+const largeurTemps = (ecoule: number) => colonnesTemps(ecoule).reduce((l, g, i) => l + g.length * CHIFFRE + (i > 0 ? DEUX_POINTS : 0), 0)
+
+function tempsQuiTourne(droite: number, depuis: number, ecoule: number): string {
+  let x = droite, s = '', k = 0
+  colonnesTemps(ecoule).forEach((groupe, i) => {
+    if (i > 0) { x -= DEUX_POINTS; s += `<text x="${x + DEUX_POINTS / 2}" y="9.5" text-anchor="middle" dominant-baseline="middle">:</text>` }
+    for (const [n, periode] of groupe) {
+      x -= CHIFFRE
+      const chiffres = RANGS(n + 1).map(j => `<text x="${(x + CHIFFRE / 2).toFixed(1)}" y="${9.5 + j * 12}" text-anchor="middle" dominant-baseline="middle">${j % n}</text>`).join('')
+      s += `<clipPath id="t${k}"><rect x="${x.toFixed(1)}" y="3" width="${CHIFFRE}" height="12"/></clipPath>` +
+        `<g clip-path="url(#t${k})"><g class="roule${n}" style="animation-duration:${periode}s;animation-delay:calc(var(--t) + ${(depuis / 1000).toFixed(2)}s)">${chiffres}</g></g>`
+      k++
+    }
+  })
+  return s
 }
+const CSS_TEMPS = '.roule10,.roule6{animation-iteration-count:infinite}.roule10{animation-name:roule10;animation-timing-function:steps(10)}' +
+  '.roule6{animation-name:roule6;animation-timing-function:steps(6)}@keyframes roule10{to{transform:translateY(-120px)}}@keyframes roule6{to{transform:translateY(-72px)}}'
 
 function dessinerFil(o: OptionsFil, c: number): string {
   const W = Math.max(40, Math.round(o.largeur))
@@ -192,7 +212,10 @@ function dessinerFil(o: OptionsFil, c: number): string {
     if (o.eclat && j === 0) eclair.case('#FFFFFF', `w${pas}`, x, 0, w, H)
     if (boucles && !endormie && bruit(k * 7 + 3, o.graine) < 0.018) etincelles += `<rect class="e" x="${x}" y="${j * c}" width="${w}" height="${c}" fill="#FFFFFF" style="animation-delay:calc(var(--t) - ${(b * 1.6).toFixed(2)}s)"/>`
   }
-  const cw = largeurEtiquette(o.mot)
+  const temps = o.depuis !== undefined && !o.fini
+  const ecoule = temps ? Math.max(0, (o.maintenant - o.depuis!) / 1000) : 0
+  const motEtiquette = temps ? `${o.mot} ·` : o.mot
+  const cw = temps ? 5 + largeurMot(motEtiquette) + 3 + Math.round(largeurTemps(ecoule)) + 5 : largeurEtiquette(motEtiquette)
   const kx = positionEtiquette(W, fin, cw)
   const kxAvant = positionEtiquette(W, finAvant, cw)
   const glisse = kxAvant !== kx ? `animation:glisse .5s cubic-bezier(.34,1.56,.64,1) both;${retard(0)};` : ''
@@ -223,7 +246,7 @@ ${RANGS(6).map(j => `.h${j}{animation:clignote .9s ease-in-out infinite;animatio
 @keyframes clignote{0%,100%{opacity:1}50%{opacity:.2}}
 .v{opacity:0;animation:fuite 1.3s ease-out infinite}@keyframes fuite{from{transform:none;opacity:.9}to{transform:translateX(22px);opacity:0}}
 .z{opacity:.6}${boucles ? '.z{animation:dort 3.4s ease-in-out infinite;animation-delay:var(--t)}@keyframes dort{0%,100%{opacity:.9}50%{opacity:.4}}' : ''}
-${appel ? '.p{animation:appel 1.2s ease-in-out infinite;animation-delay:var(--t)}@keyframes appel{0%,100%{opacity:1}50%{opacity:.45}}' : ''}
+${appel ? '.p{animation:appel 1.2s ease-in-out infinite;animation-delay:var(--t)}@keyframes appel{0%,100%{opacity:1}50%{opacity:.45}}' : ''}${temps ? CSS_TEMPS : ''}
 .k{transform:translateX(${kx}px);${glisse}}@keyframes glisse{from{transform:translateX(${kxAvant}px)}to{transform:translateX(${kx}px)}}
 .pop{transform-origin:${cw / 2}px 9px;animation:pop .5s cubic-bezier(.34,1.56,.64,1);${retard(0)}}@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
 .g{opacity:0;animation:gerbe .9s ease-out forwards}@keyframes gerbe{0%{transform:none;opacity:1}45%{transform:translate(calc(var(--dx) * .55),var(--up));opacity:1}100%{transform:translate(var(--dx),var(--dy));opacity:0}}`
@@ -236,7 +259,8 @@ ${appel ? '.p{animation:appel 1.2s ease-in-out infinite;animation-delay:var(--t)
     `<g clip-path="url(#p)" shape-rendering="crispEdges"${appel ? ' class="p"' : ''}>${endormie ? `<g class="z">${fond.svg()}</g>` : fond.svg()}${sur.svg()}${eclair.svg()}${etincelles}${fuite}<g clip-path="url(#q)">${o.fini || endormie || !boucles ? '' : reflet(fin, H, c)}</g></g>` +
     gerbe +
     `<g class="k"><g${o.eclat ? ' class="pop"' : ''}><rect y="3" width="${cw}" height="12" rx="3" fill-opacity=".8" fill="${pal[3]}" stroke="rgba(255,255,255,.3)" stroke-width=".5"/>` +
-    `<text x="5" y="9.5" dominant-baseline="middle" fill="#FFFFFF" font-size="10" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${echapper(o.mot)}</text></g></g>` +
+    `<text x="${temps ? 5 + largeurMot(motEtiquette) : 5}" y="9.5"${temps ? ' text-anchor="end"' : ''} dominant-baseline="middle" fill="#FFFFFF" font-size="10" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${echapper(motEtiquette)}</text>` +
+    (temps ? `<g fill="#FFFFFF" font-size="10" font-weight="600" font-family="Segoe UI, system-ui, sans-serif" style="font-variant-numeric:tabular-nums">${tempsQuiTourne(cw - 5, o.depuis!, ecoule)}</g>` : '') + `</g></g>` +
     `</svg>`
 }
 
@@ -244,8 +268,11 @@ const LIMITE = 125000
 
 export function svgFil(o: OptionsFil): string {
   // coupées : la barre est dessinée comme si rien ne venait de changer (ni colonnes neuves, ni vague, ni fanfare)
-  const p = o.animations === 'coupees' ? { ...o, avant: o.fini ? 1 : o.progression, niveauAvant: o.niveau, eclat: false } : o
-  return memoise(JSON.stringify({ ...p, maintenant: 0, endormie: assoupie(p) }), () => {
+  // coupées : la barre est dessinée comme si rien ne venait de changer, et sans temps qui tourne (une image fixe)
+  const p = o.animations === 'coupees' ? { ...o, avant: o.fini ? 1 : o.progression, niveauAvant: o.niveau, eclat: false, depuis: undefined } : o
+  // le temps ne change l'image qu'en ajoutant une colonne (10 min, 1 h) : sa tranche entre dans la clé, pas l'heure
+  const tranche = p.depuis === undefined ? 0 : colonnesTemps(Math.max(0, (p.maintenant - p.depuis) / 1000)).flat().length
+  return memoise(JSON.stringify({ ...p, maintenant: 0, endormie: assoupie(p), tranche }), () => {
     let s = ''
     for (const c of [3, 4, 5, 6, 8]) {
       s = dessinerFil(p, c)

@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.5) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.6) |
 
 ## Aperçu
 
@@ -137,7 +137,7 @@ Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` 
 - le pourcentage ;
 - la croix **×**, une fois le travail fini. Sa place est gardée sur chaque ligne : toutes les barres ont la même longueur.
 
-**Le temps écoulé** est dans l'étiquette de la barre. Pendant le travail, passe la souris sur la barre : l'étiquette devient « Lecture · 1:48 ». À 100 %, il s'affiche tout seul (« ✓ Fini · 3:42 ») pendant les 5 secondes où la barre reste affichée. Au terminal, où la souris ne compte pas, il s'affiche seulement à 100 %.
+**Le temps écoulé** est dans l'étiquette de la barre : « Lecture · 1:48 », et les secondes défilent toutes seules. À 100 %, il s'arrête (« ✓ Fini · 3:42 ») pendant les 5 secondes où la barre reste affichée. Avec les animations « Coupées », il n'apparaît qu'à la fin.
 
 **Comment la barre avance.** Si Claude tient une liste de tâches, la barre avance à chaque tâche finie. Sinon (c'est le cas aujourd'hui : Claude Code ne lui donne pas d'outil de liste de tâches), elle avance par estimation : elle ralentit vers 90 %, puis passe à 100 % à la fin.
 
