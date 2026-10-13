@@ -1,6 +1,6 @@
 {
   "name": "pupitre",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Jauge, progression de Claude et des sous-agents, cap, relais et plume, au-dessus de la zone de texte.",
   "types": "./types/index.d.ts",
   "author": {
