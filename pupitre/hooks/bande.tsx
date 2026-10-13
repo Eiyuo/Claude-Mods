@@ -119,6 +119,7 @@ export type EtatBande = {
   expliquerCache?: () => void // clic sur le cache : une notification l'explique
   fermer?: () => void // croix « Fermer » : retire les barres /fil une fois le travail fini
   fermerAutre?: (id: string) => void // croix d'une autre discussion finie : retire sa ligne
+  ouvrirAutre?: (id: string) => void // clic sur le titre d'une autre discussion : l'application bascule dessus
   reglage?: ActionsReglage // ligne « Pupitre : ✓ Jauge ✓ Fil … », dépliée par le bouton « Réglages »
 }
 
@@ -176,6 +177,7 @@ type Rang = {
   mot: string; majLe: number; debut: number; finiLe: number | null
   attente: boolean // Claude attend ta réponse : « ? » et barre orange qui pulse
   fermer?: { cle: string; action: () => void }
+  ouvrir?: { cle: string; action: () => void } // le titre se clique
 }
 const MOT_APPEL = 'Ta réponse ?'
 
@@ -195,7 +197,9 @@ function rang(T: Elements, surface: string, colonnes: number, r: Rang, maintenan
   return (
     <Box key={`l-${r.cle}`} flexDirection="row" gap={1} alignItems="center">
       <Box width={COL_ICONE}><Text color={couleur} wrap="truncate">{r.icone}</Text></Box>
-      <Box width={COL_TITRE}><Text dimColor={r.secondaire} wrap="truncate">{r.titre}</Text></Box>
+      <Box width={COL_TITRE}>{r.ouvrir
+        ? <Button key={r.ouvrir.cle} label={r.titre} plain onPress={() => r.ouvrir!.action()} />
+        : <Text dimColor={r.secondaire} wrap="truncate">{r.titre}</Text>}</Box>
       <Box width={largeur}>{barre}</Box>
       <Box width={COL_PCT} justifyContent="flex-end"><Text dimColor wrap="truncate">{pct}</Text></Box>
       {/* croix de fermeture : le bureau ne dessine d'un Button que son label (ni son contenu, ni role « dismiss »
@@ -224,7 +228,7 @@ export function titreAutre(demande: string, dossier: string): string {
   return `${tronquer(demande, Math.max(8, COL_TITRE - d.length - 3))} · ${d}`
 }
 
-function depuisAutre(a: Autre, fermer?: (id: string) => void): Rang {
+function depuisAutre(a: Autre, fermer?: (id: string) => void, ouvrir?: (id: string) => void): Rang {
   const fini = a.finiLe !== null
   return {
     // ⧉ : une autre fenêtre, en cours comme finie (la barre verte dit la fin) ; « ? » quand son Claude attend
@@ -234,6 +238,7 @@ function depuisAutre(a: Autre, fermer?: (id: string) => void): Rang {
     progression: a.progression, avant: a.progression, niveau: fini ? 6 : a.niveau, niveauAvant: fini ? 6 : a.niveau, fini, eclat: false,
     mot: a.attente ? MOT_APPEL : a.mot || (fini ? '✓ Fini' : 'En cours'), majLe: a.majLe, debut: a.debut, finiLe: a.finiLe,
     fermer: fini && fermer ? { cle: `fermer-${a.id}`, action: () => fermer(a.id) } : undefined,
+    ouvrir: ouvrir ? { cle: `ouvrir-${a.id}`, action: () => ouvrir(a.id) } : undefined,
   }
 }
 
@@ -252,7 +257,7 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
     ...lignes.map((l, i) => rang(T, surface, colonnes, depuisLigne(l, i === 0 ? fermer : undefined), s.maintenant, s.animations)),
     // un titre discret sépare les autres conversations de la tienne (la bande ne trace pas de trait seul, rien qu'un cadre)
     autres.length > 0 ? <Text key="titre-autres" dimColor wrap="truncate">Autres discussions</Text> : null,
-    ...autres.map(a => rang(T, surface, colonnes, depuisAutre(a, s.fermerAutre), s.maintenant, s.animations)),
+    ...autres.map(a => rang(T, surface, colonnes, depuisAutre(a, s.fermerAutre, s.ouvrirAutre), s.maintenant, s.animations)),
     ligneJauge?.arbre ?? null,
     // sur le bureau, les boutons sont dans la barre du bas : la ligne reste pour « Effacer », et le cache s'il n'a pas tenu
     jauge && (s.boutons.length > 0 || cacheDessous !== null) ? dessinerBoutons(T, s.boutons, cacheDessous, s.expliquerCache) : null,

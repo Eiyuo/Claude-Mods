@@ -231,6 +231,72 @@ test('travail fini : la barre passe au vert avec une croix « Fermer », qui la 
   await ui.unmount()
 })
 
+// Une autre discussion en cours, et les fiches que l'application de bureau garde de chaque conversation (identifiant
+// du bureau « local_… » et identifiant du moteur) ; rend les commandes lancées et les notifications.
+async function autreDiscussion($: any, on: any, fichesBureau: Record<string, { sessionId: string; cliSessionId: string }>) {
+  const liens: string[] = [] // les adresses ouvertes
+  const toasts: string[] = []
+  on('process.run', async ($: unknown, e: { argv: string[]; init?: { env?: Record<string, string> } }) => { const lien = e.init?.env?.PUPITRE_LIEN; if (lien) liens.push(lien); return { value: { exitCode: 0, stdout: '', stderr: '' } } as never })
+  on('ui.toast', async ($: unknown, e: { text: string }) => { toasts.push(e.text); return { value: undefined } as never })
+  mock.env(on, { OS: 'Windows_NT', USERPROFILE: 'C:/Users/essai', APPDATA: 'C:/Users/essai/AppData/Roaming' })
+  const horloge = mock.clock(on, { now: 1_000_000 })
+  const L: LigneFil = { id: 'claude', qui: 'Passer au design', tache: 'En cours', mot: 'Web', compteur: '≈', progression: 0.3, avant: 0, niveau: 1, niveauAvant: 1, fini: false, eclat: false, attente: false, debut: horloge.now(), majLe: horloge.now(), finiLe: null }
+  const fiche = JSON.stringify(ficheDe('moteur-autre', 'Atelier', L, horloge.now()))
+  const bureau = 'C:/Users/essai/AppData/Roaming/Claude/claude-code-sessions'
+  on('fs.write', async () => ({ value: undefined }) as never)
+  on('fs.list', async ($: unknown, e: { path: string }) => {
+    const p = e.path.replace(/\\/g, '/')
+    const entree = (name: string, kind: string) => ({ name, kind, size: 10, mtimeMs: horloge.now(), isLink: false })
+    if (p.endsWith('/pupitre/sessions')) return { value: [entree('autre.json', 'file')] } as never
+    if (p === bureau) return { value: [entree('compte', 'dir')] } as never
+    if (p === `${bureau}/compte`) return { value: [entree('org', 'dir')] } as never
+    if (p === `${bureau}/compte/org`) return { value: Object.keys(fichesBureau).map(n => entree(n, 'file')) } as never
+    throw new Error('absent')
+  })
+  on('fs.read', async ($: unknown, e: { path: string }) => {
+    const nom = e.path.replace(/\\/g, '/').split('/').pop()!
+    return { value: nom === 'autre.json' ? fiche : JSON.stringify(fichesBureau[nom]) } as never
+  })
+  on('session.start', async (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
+  on('command.register', async () => ({ value: undefined }) as never)
+  on('session.id', async () => ({ value: 'moi' }) as never)
+  on('session.cwd', async () => ({ value: 'C:/Users/essai/ici' }) as never)
+  on('session.usage', async () => ({ value: { context: { window: 200_000 }, rateLimits: [] } }) as never)
+  mock.store(on)
+  on('ui.render', async () => ({ type: 'Text', props: {}, children: ['(bande du moteur)'] }) as never)
+  await $.command.run({ command: 'pupitre', args: '' })
+  await $.session.start({ cwd: 'C:/Users/essai/ici', surface: 'desktop', isInteractive: true })
+  await horloge.advance(2_000)
+  return { liens, toasts }
+}
+
+// Vérifié sur le bureau le 13/10/2026 : claude://code/continue?session=local_… bascule l'application sur la conversation.
+test('autre discussion : un clic sur son titre bascule l application de bureau sur cette conversation', async ($, on) => {
+  const { liens, toasts } = await autreDiscussion($, on, {
+    'local_premiere.json': { sessionId: 'local_premiere', cliSessionId: 'quelqu-un-d-autre' },
+    'local_1234abcd-5678.json': { sessionId: 'local_1234abcd-5678', cliSessionId: 'moteur-autre' }, // le bureau a son propre identifiant
+  })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  const titre = (await ui.findAll({ type: 'Button' })).find(b => b.key === 'ouvrir-moteur-autre')!
+  expect(titre.props.label).toBe('Passer au design · Atelier')
+  expect(titre.props.plain).toBe(true) // l'aspect d'un titre, pas d'un bouton
+  await ui.press({ key: 'ouvrir-moteur-autre' })
+  expect(liens).toEqual(['claude://code/continue?session=local_1234abcd-5678'])
+  expect(toasts.filter(t => t.includes('discussion'))).toEqual([]) // ni « ne s'ouvre pas », ni « n'a pas pu »
+  await ui.unmount()
+})
+
+test('autre discussion : sans fiche du bureau qui convienne, rien n est lancé et une notification le dit', async ($, on) => {
+  const { liens, toasts } = await autreDiscussion($, on, {
+    'local_x.json': { sessionId: "local_x'; Remove-Item", cliSessionId: 'moteur-autre' }, // un identifiant qui n'en est pas un
+  })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  await ui.press({ key: 'ouvrir-moteur-autre' })
+  expect(liens).toEqual([])
+  expect(toasts.some(t => t.includes('ne s'))).toBe(true)
+  await ui.unmount()
+})
+
 test('autre discussion finie : sa ligne reste quelques secondes avec sa croix, même l autre discussion fermée, puis s efface', async ($, on) => {
   let fiche = ''
   let ecriteLe = 0

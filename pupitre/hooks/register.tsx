@@ -192,6 +192,37 @@ async function carillon($: Dollar): Promise<void> {
   await $.process.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', '(New-Object Media.SoundPlayer $env:PUPITRE_SON).PlaySync()'], { env: { PUPITRE_SON: `${$.plugin.root}/assets/carillon.wav` } })
 }
 
+// Bascule l'application de bureau sur une autre discussion (vérifié sur le bureau le 13/10/2026) : elle ouvre
+// claude://code/continue?session=local_…, avec son propre identifiant de la conversation (lu dans son code). Il ne vaut
+// le plus souvent pas « local_ » + celui du moteur : on le lit dans les fiches qu'elle garde de chaque conversation.
+async function ouvrirAutre($: Dollar, id: string): Promise<void> {
+  const appdata = await $.env.get('APPDATA')
+  const local = (await $.env.get('OS')) === 'Windows_NT' && appdata ? await localDe($, `${appdata}/Claude/claude-code-sessions`, id, 3) : null
+  if (local === null) { $.ui.toast("Pupitre : cette discussion ne s'ouvre pas d'ici."); return }
+  // l'adresse passe par une variable, comme le chemin du carillon
+  await $.process.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', 'Start-Process $env:PUPITRE_LIEN'], { env: { PUPITRE_LIEN: `claude://code/continue?session=${local}` } })
+}
+
+// L'identifiant du bureau de la conversation dont celui du moteur est `id`, dans ses fiches (rangées par compte, puis
+// par organisation) ; seulement s'il a la forme que le bureau accepte, puisqu'il part dans une commande.
+async function localDe($: Dollar, dossier: string, id: string, profondeur: number): Promise<string | null> {
+  let entrees: { name: string; kind: string }[] = []
+  try { entrees = await $.fs.list(dossier) } catch { return null }
+  for (const en of entrees) {
+    const chemin = `${dossier}/${en.name}`
+    if (en.kind === 'dir' && profondeur > 1) {
+      const local = await localDe($, chemin, id, profondeur - 1)
+      if (local !== null) return local
+    } else if (en.kind === 'file' && /^local_.*\.json$/.test(en.name)) {
+      try {
+        const o = JSON.parse(String(await $.fs.read(chemin))) as { sessionId?: unknown; cliSessionId?: unknown }
+        if (o.cliSessionId === id && typeof o.sessionId === 'string' && /^local_[A-Za-z0-9-]{1,64}$/.test(o.sessionId)) return o.sessionId
+      } catch { /* fiche illisible : la suivante */ }
+    }
+  }
+  return null
+}
+
 async function fermerFil($: Dollar): Promise<void> {
   if ([...suivis.values()].some(s => s.fin === null)) return // seulement une fois le travail fini
   suivis.clear()
@@ -494,6 +525,7 @@ export const register: Register = on => {
       boutons,
       fermer: () => { void fermerFil($) },
       fermerAutre: id => { void update($, autresA, l => l.filter(a => a.id !== id)) },
+      ouvrirAutre: id => { void ouvrirAutre($, id).catch(() => $.ui.toast("Pupitre : cette discussion n'a pas pu s'ouvrir.")) },
       reglage: {
         ouvert: await read($, ouvertA),
         basculer: c => { void boutonReglage($, c) },

@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.10) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.11) |
 
 ## Aperçu
 
@@ -165,7 +165,7 @@ Le fond de la barre prend aussi une teinte légère de la couleur en cours, avec
 
 **À la fin.** Quand Claude a fini de répondre, les barres passent au vert, puis s'effacent toutes seules au bout de 5 secondes. La croix **×** au bout de la ligne de Claude les retire plus tôt. Dès que 2 barres ou plus sont finies (les tiennes comme celles des autres discussions), le bouton **« Effacer les barres finies »** apparaît sur la ligne des boutons : il retire toutes les barres vertes d'un coup et garde celles en cours.
 
-**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît dans la même liste, sous un petit titre « Autres discussions », avec l'icône ⧉ et le nom de son dossier : « Ajoute du beurre… · essai-relais ». Si son Claude attend une réponse, sa barre passe à l'orange ici aussi. Tu suis ainsi tout ce qui tourne, sans changer de fenêtre. Quand elle a fini, sa ligne passe au vert, puis s'efface au bout de 5 secondes ; la croix **×** au bout de la ligne la retire plus tôt.
+**Les autres discussions.** Si une autre fenêtre de discussion travaille en même temps, elle apparaît dans la même liste, sous un petit titre « Autres discussions », avec l'icône ⧉ et le nom de son dossier : « Ajoute du beurre… · essai-relais ». Si son Claude attend une réponse, sa barre passe à l'orange ici aussi. Tu suis ainsi tout ce qui tourne, sans changer de fenêtre. Un clic sur son titre t'y emmène : l'application de bureau bascule sur cette conversation (sous Windows). Quand elle a fini, sa ligne passe au vert, puis s'efface au bout de 5 secondes ; la croix **×** au bout de la ligne la retire plus tôt.
 
 **Le son.** Un carillon doux de deux notes sonne quand Claude a fini, si la réponse a pris plus de 30 secondes. Pas de son pour les réponses rapides.
 
