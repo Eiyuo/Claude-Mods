@@ -8,7 +8,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 ## Aperçu
 
-![La bande du pupitre (jauge et cache) au-dessus de la zone de texte, et ses boutons dans la barre du bas](docs/images/bande.png)
+![La jauge du pupitre au-dessus de la zone de texte : contexte, limites 5 h et 7 jours, et la part du cache, séparés par des traits](docs/images/bande.png)
 
 La bande s'affiche au-dessus de la zone de texte. On y trouve la jauge (mémoire de la conversation, limites sur 5 heures et sur 7 jours), la part de la dernière demande lue dans le cache, et les boutons « Passer le relais », « Améliorer le prompt » et « Réglages ».
 
