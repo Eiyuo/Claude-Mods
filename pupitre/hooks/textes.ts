@@ -52,11 +52,6 @@ export const REPRISE_RELAIS =
   "attente avec ses options, puis attends ma décision ; sinon, reprends à « Prochaines étapes », sans refaire ce qui est " +
   "déjà fait ni les « Pistes écartées »."
 
-// Le clic sur « Cache 99 % ⓘ » : la même explication que le README, en une notification.
-export const explicationCache = (pct: number): string =>
-  `Pupitre : ${pct} % de ta dernière demande était déjà en mémoire chez Anthropic, donc plus rapide et moins cher. ` +
-  "C'est normal qu'il baisse au début d'une conversation, après un relais ou une longue pause."
-
 export function relaisEcrit(mtimeMs: number | null, debut: number): boolean {
   return mtimeMs !== null && mtimeMs >= debut
 }

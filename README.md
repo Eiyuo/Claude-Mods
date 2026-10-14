@@ -4,13 +4,13 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.11) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.12) |
 
 ## Aperçu
 
-![La jauge du pupitre au-dessus de la zone de texte : contexte, limites 5 h et 7 jours, et la part du cache, séparés par des traits](docs/images/bande.png)
+![La jauge du pupitre au-dessus de la zone de texte : contexte, limites 5 h et 7 jours, séparés par des traits](docs/images/bande.png)
 
-La bande s'affiche au-dessus de la zone de texte. On y trouve la jauge (mémoire de la conversation, limites sur 5 heures et sur 7 jours), la part de la dernière demande lue dans le cache, et les boutons « Passer le relais », « Améliorer le prompt » et « Réglages ».
+La bande s'affiche au-dessus de la zone de texte. On y trouve la jauge (mémoire de la conversation, limites sur 5 heures et sur 7 jours) et les boutons « Passer le relais », « Améliorer le prompt » et « Réglages ».
 
 **Les barres de travail** (`/fil`) : une par travail en cours. Elles changent de couleur en avançant, et l'étiquette donne l'étape en cours. Les images ci-dessous sont dessinées par le code du mod lui-même :
 
@@ -120,14 +120,9 @@ Le symbole **↻** donne le temps avant la remise à zéro. Chaque texte tient s
 
 Claude Code ne fournit les limites 5 h et 7 jours qu'avec un abonnement (Pro, Max, Team…). Sans abonnement, elles affichent « — ».
 
-Les éléments de la jauge sont serrés et séparés par un trait « │ ». Au bout de la ligne, le cache (par exemple « Cache 99 % ») : un clic dessus l'explique en une phrase. Quand la fenêtre est trop étroite, il redescend sur la ligne du dessous (« Cache 99 % ⓘ ») avant que la jauge perde quoi que ce soit.
+Les éléments de la jauge sont serrés et séparés par un trait « │ ».
 
-Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ». Sur l'application de bureau, « ⇄ Relais », « Améliorer » (« Retour » après une amélioration) et « ⚙ » (les réglages) sont dans la barre du bas de la zone de texte, à côté du modèle : à part de la bande, ils ne sont plus redessinés par les barres, et un clic ne les fait plus clignoter. Le cache et « Effacer les barres finies » restent dans la bande.
-
-**Le cache.** À chaque réponse, Claude ne se souvient de rien tout seul : toute la conversation lui est renvoyée (ses consignes, les messages précédents, les fichiers lus). Pour ne pas tout retraiter à chaque fois, Anthropic garde un moment en mémoire le début de la conversation qui n'a pas changé : c'est le cache. Le pourcentage donne la part de ta dernière demande qui venait de ce cache.
-- **Un chiffre haut (souvent 99 %) est le bon cas** : d'un message à l'autre, seuls ton nouveau message et les derniers résultats sont nouveaux. Les réponses sont plus rapides, et la partie relue depuis le cache coûte beaucoup moins cher.
-- **Il baisse normalement** au début d'une conversation, après un `/clear` ou un relais (rien n'est encore en mémoire), après une longue pause (le cache expire) ou quand tu changes de modèle.
-- **Un chiffre bas qui se répète** au milieu d'une conversation qui avance normalement est le seul signe à surveiller : le travail est alors refait trop souvent.
+Juste sous la jauge, une ligne de boutons, calée à droite : ceux de `/relais` et `/plume` quand ils sont allumés, puis « Réglages ». Sur l'application de bureau, « ⇄ Relais », « Améliorer » (« Retour » après une amélioration) et « ⚙ » (les réglages) sont dans la barre du bas de la zone de texte, à côté du modèle : à part de la bande, ils ne sont plus redessinés par les barres, et un clic ne les fait plus clignoter. « Effacer les barres finies » reste dans la bande.
 
 ### Le fil (`/fil`)
 

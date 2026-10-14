@@ -3,10 +3,10 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Animations, Autre, LigneFil, Mesures, Plume, ReglageRelais, Reglages } from '../types'
 import { AUCUN, basculer, changerSeuil, jaugeVisible, lireAnimations, lireRelais, lireReglages, type Commande } from './reglages'
-import { MESURES_VIDES, lireMesures, pourcentageCache, type UsageLu } from './jauge'
+import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, dessinerBoutons, piedDe, type Bouton, type Elements, type Pied } from './bande'
 import { appliquerAppel, debutTour, encoreVisible, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, explicationCache, messageHumain, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
+import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, messageHumain, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 import { palier } from './pixels'
 
@@ -22,7 +22,6 @@ export const plumeA = atom({ plugin: 'pupitre', key: 'plume' } as const, { origi
 export const ouvertA = atom({ plugin: 'pupitre', key: 'reglagesOuverts' } as const, false)
 export const chargeA = atom({ plugin: 'pupitre', key: 'charge' } as const, false)
 export const relaisA = atom({ plugin: 'pupitre', key: 'relais' } as const, lireRelais(undefined) as ReglageRelais)
-export const cacheA = atom({ plugin: 'pupitre', key: 'cache' } as const, null as number | null)
 export const animationsA = atom({ plugin: 'pupitre', key: 'animations' } as const, 'completes' as Animations)
 
 let derniereUsage: UsageLu | null = null
@@ -437,11 +436,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId ?? 'claude'
-    if (!e.agentId) {
-      tourEnCours = false
-      const cache = pourcentageCache(e.usage)
-      if (cache !== null) await update($, cacheA, () => cache)
-    }
+    if (!e.agentId) tourEnCours = false
     if (!e.agentId && e.durationMs > SEUIL_SON_MS && !e.isAborted && (await read($, reglagesA)).fil) {
       void carillon($).catch(() => { /* pas de sortie audio */ })
     }
@@ -506,19 +501,16 @@ export const register: Register = on => {
     const autres = await read($, autresA)
     const mesures = await read($, mesuresA)
     const relais = await read($, relaisA)
-    // sur le bureau, relais, plume et Réglages sont dans la barre du bas (voir SessionMode) : « Effacer » et le cache restent ici
+    // sur le bureau, relais, plume et Réglages sont dans la barre du bas (voir SessionMode) : « Effacer » reste ici
     const tous = await boutonsDe($, r, piedDe(lignes, autres, mesures, relais.seuil))
     const boutons = e.surface === 'desktop' ? tous.filter(b => b.cle === 'effacer') : tous
     await read($, maintenantA) // abonne la bande au tic (voir le tic d'une seconde) ; les images, elles, veulent l'heure exacte du dessin
     const maintenant = await $.clock.now()
-    const cache = await read($, cacheA)
     const animations = await read($, animationsA)
     const arbre = dessinerBande(T, e.surface, e.props.bodyColumns, e.props.maxRows, {
       reglages: r,
       mesures,
       animations,
-      cache,
-      expliquerCache: () => { if (cache !== null) $.ui.toast(explicationCache(cache)) },
       lignes,
       autres,
       maintenant,
@@ -550,7 +542,7 @@ export const register: Register = on => {
     const r = await read($, reglagesA)
     if (!jaugeVisible(r)) return next(e)
     const T = $.ui.resolve(e) as unknown as Elements
-    const ligne = dessinerBoutons(T, await boutonsDe($, r, { effacer: false, relais: null }, true), null)
+    const ligne = dessinerBoutons(T, await boutonsDe($, r, { effacer: false, relais: null }, true))
     if (e.props.modes.length === 0) return ligne as never
     const { Box, Text } = T
     return (<Box flexDirection="row" gap={1}><Text dimColor wrap="truncate">{e.props.modes.join(' & ')}</Text>{ligne}</Box>) as never

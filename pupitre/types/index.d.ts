@@ -25,7 +25,6 @@ declare module 'claude-code' {
       reglagesOuverts: boolean
       charge: boolean
       relais: ReglageRelais
-      cache: number | null
       animations: Animations
     }
   }

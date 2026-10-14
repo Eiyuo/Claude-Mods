@@ -20,28 +20,22 @@ export type Largeur = (texte: string, gras?: boolean) => number // en colonnes
 export const largeurBureau: Largeur = (texte, gras = false) => Array.from(texte).reduce((l, c) =>
   l + (c === ' ' ? 0.4 : /[iljtfr.,:;'·│]/.test(c) ? 0.5 : /[mwMW%]/.test(c) ? 1.3 : /[A-ZÀ-Ý]/.test(c) ? 1.15 : 1), 0) * (gras ? 1.1 : 1)
 
-// Jauge sur une seule ligne, serrée : « nom ▰▰▱ 86 % ↻ 2 h 12 │ … │ Cache 82 % » (demande du 13/10/2026). Les barres
-// prennent la place qui reste (20 colonnes au plus). Quand la place manque, dans l'ordre : le cache redescend sur la
-// ligne du dessous, les comptes à rebours « ↻ » quittent la ligne (barres sous 6), les noms raccourcissent (« 5 h »,
-// « 7 jours »), puis les barres descendent à 4. Les textes ne passent jamais à la ligne : au pire, ils se coupent avec « … ».
-// cache : sa largeur (0 sans cache).
-export function dispositionJauge(colonnes: number, morceaux: readonly Morceau[], cache: number, largeur: Largeur): { barre: number; avecCourt: boolean; abrege: boolean; avecCache: boolean } {
+// Jauge sur une seule ligne, serrée : « nom ▰▰▱ 86 % ↻ 2 h 12 │ … » (demande du 13/10/2026). Les barres prennent la
+// place qui reste (20 colonnes au plus). Quand la place manque, dans l'ordre : les comptes à rebours « ↻ » quittent la
+// ligne (barres sous 6), les noms raccourcissent (« 5 h », « 7 jours »), puis les barres descendent à 4. Les textes ne
+// passent jamais à la ligne : au pire, ils se coupent avec « … ».
+export function dispositionJauge(colonnes: number, morceaux: readonly Morceau[], largeur: Largeur): { barre: number; avecCourt: boolean; abrege: boolean } {
   const n = morceaux.length
-  if (n === 0) return { barre: 0, avecCourt: false, abrege: false, avecCache: false }
+  if (n === 0) return { barre: 0, avecCourt: false, abrege: false }
   const trait = 2 + largeur('│') // un écart de chaque côté du trait
   const texte = (avecCourt: boolean, abrege: boolean) => morceaux.reduce((t, m) =>
     t + largeur(abrege ? (m.abrege ?? m.nom) : m.nom) + largeur(m.pct, true) + 2 + (avecCourt && m.court ? largeur(m.court) + 1 : 0), 0)
-  const barre = (avecCourt: boolean, abrege: boolean, avecCache: boolean) =>
-    Math.floor((colonnes - trait * (n - 1) - (avecCache ? trait + cache : 0) - texte(avecCourt, abrege)) / n)
-  if (cache > 0) {
-    const b = barre(true, false, true)
-    if (b >= BARRE_CONFORT) return { barre: Math.min(BARRE_MAX, b), avecCourt: true, abrege: false, avecCache: true }
-  }
+  const barre = (avecCourt: boolean, abrege: boolean) => Math.floor((colonnes - trait * (n - 1) - texte(avecCourt, abrege)) / n)
   for (const avecCourt of [true, false]) {
-    const b = barre(avecCourt, false, false)
-    if (b >= BARRE_CONFORT) return { barre: Math.min(BARRE_MAX, b), avecCourt, abrege: false, avecCache: false }
+    const b = barre(avecCourt, false)
+    if (b >= BARRE_CONFORT) return { barre: Math.min(BARRE_MAX, b), avecCourt, abrege: false }
   }
-  return { barre: Math.max(BARRE_MIN, Math.min(BARRE_MAX, barre(false, true, false))), avecCourt: false, abrege: true, avecCache: false }
+  return { barre: Math.max(BARRE_MIN, Math.min(BARRE_MAX, barre(false, true))), avecCourt: false, abrege: true }
 }
 
 function mesure(T: Elements, surface: string, nom: string, affiche: string, m: Mesure, barre: number, avecCourt: boolean, maintenant: number, animations: Animations) {
@@ -63,38 +57,26 @@ function mesure(T: Elements, surface: string, nom: string, affiche: string, m: M
   )
 }
 
-// La ligne de la jauge : les trois mesures serrées, séparées d'un trait, et le cache au bout quand il tient ; un clic
-// sur le cache l'explique. avecCache dit si le cache a trouvé sa place, sinon il reste sur la ligne du dessous.
-export function dessinerJauge(T: Elements, surface: string, colonnes: number, mesures: Mesures, maintenant: number, animations: Animations, cache: number | null, expliquer?: () => void) {
-  const { Box, Text, Button } = T
+// La ligne de la jauge : les trois mesures serrées, séparées d'un trait.
+export function dessinerJauge(T: Elements, surface: string, colonnes: number, mesures: Mesures, maintenant: number, animations: Animations) {
+  const { Box, Text } = T
   const largeur: Largeur = surface === 'terminal' ? t => t.length : largeurBureau
-  const libelleCache = `Cache ${cache} %`
   const liste: [string, string, Mesure][] = [['Contexte', 'Contexte', mesures.contexte], ['Limite 5 h', '5 h', mesures.cinqH], ['Limite 7 jours', '7 jours', mesures.septJ]]
-  const { barre, avecCourt, abrege, avecCache } = dispositionJauge(colonnes, liste.map(([nom, court, m]) => ({ nom, abrege: court, pct: formatPct(m.pct), court: m.court ?? '' })), cache === null ? 0 : largeur(libelleCache), largeur)
+  const { barre, avecCourt, abrege } = dispositionJauge(colonnes, liste.map(([nom, court, m]) => ({ nom, abrege: court, pct: formatPct(m.pct), court: m.court ?? '' })), largeur)
   const trait = (cle: string) => <Text key={cle} dimColor wrap="truncate">│</Text>
-  return {
-    avecCache,
-    arbre: (
-      <Box flexDirection="row" alignItems="center" gap={1}>
-        {liste.flatMap(([nom, court, m], i) => [i > 0 ? trait(`trait-${nom}`) : null, mesure(T, surface, nom, abrege ? court : nom, m, barre, avecCourt, maintenant, animations)])}
-        {avecCache ? trait('trait-cache') : null}
-        {avecCache ? (expliquer ? <Button key="cache" label={libelleCache} plain dimColor onPress={() => expliquer()} /> : <Text dimColor wrap="truncate">{libelleCache}</Text>) : null}
-      </Box>
-    ),
-  }
+  return (
+    <Box flexDirection="row" alignItems="center" gap={1}>
+      {liste.flatMap(([nom, court, m], i) => [i > 0 ? trait(`trait-${nom}`) : null, mesure(T, surface, nom, abrege ? court : nom, m, barre, avecCourt, maintenant, animations)])}
+    </Box>
+  )
 }
 
-// La ligne des boutons, sous la jauge, calée à droite ; à gauche, la part du cache quand on la connaît, qu'un clic explique.
-export function dessinerBoutons(T: Elements, boutons: readonly Bouton[], cache: number | null, expliquer?: () => void) {
-  const { Box, Button, Text } = T
+// La ligne des boutons, sous la jauge, calée à droite.
+export function dessinerBoutons(T: Elements, boutons: readonly Bouton[]) {
+  const { Box, Button } = T
   return (
-    <Box flexDirection="row" alignItems="center" justifyContent={cache === null ? 'flex-end' : 'space-between'} gap={1}>
-      {cache === null ? null : expliquer
-        ? <Button key="cache" label={`Cache ${cache} % ⓘ`} plain dimColor onPress={() => expliquer()} />
-        : <Text dimColor wrap="truncate">{`Cache ${cache} %`}</Text>}
-      <Box flexDirection="row" alignItems="center" gap={1}>
-        {boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}
-      </Box>
+    <Box flexDirection="row" alignItems="center" justifyContent="flex-end" gap={1}>
+      {boutons.map(b => <Button key={b.cle} label={b.libelle} onPress={() => b.action()} />)}
     </Box>
   )
 }
@@ -115,8 +97,6 @@ export type EtatBande = {
   maintenant: number // heure du dessin : chronos, et animations des images (voir pixels.ts)
   animations: Animations // réglage « Animations » : complètes, réduites ou coupées
   boutons: readonly Bouton[]
-  cache: number | null // part de la dernière demande lue dans le cache, en %
-  expliquerCache?: () => void // clic sur le cache : une notification l'explique
   fermer?: () => void // croix « Fermer » : retire les barres /fil une fois le travail fini
   fermerAutre?: (id: string) => void // croix d'une autre discussion finie : retire sa ligne
   ouvrirAutre?: (id: string) => void // clic sur le titre d'une autre discussion : l'application bascule dessus
@@ -250,17 +230,15 @@ export function dessinerBande(T: Elements, surface: string, colonnes: number, ma
   if (!jauge && lignes.length === 0 && autres.length === 0) return null
   // croix « Fermer » sur la première ligne /fil, une fois que tout est fini
   const fermer = s.fermer && lignes.length > 0 && lignes.every(l => l.fini) ? s.fermer : undefined
-  const ligneJauge = s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.maintenant, s.animations, s.cache, s.expliquerCache) : null
-  const cacheDessous = s.reglages.jauge && !ligneJauge?.avecCache ? s.cache : null // pas de place sur la ligne de la jauge
   // de haut en bas : cette discussion (Claude, puis ses sous-agents), les autres, la jauge, les boutons, les réglages
   const rangs = [
     ...lignes.map((l, i) => rang(T, surface, colonnes, depuisLigne(l, i === 0 ? fermer : undefined), s.maintenant, s.animations)),
     // un titre discret sépare les autres conversations de la tienne (la bande ne trace pas de trait seul, rien qu'un cadre)
     autres.length > 0 ? <Text key="titre-autres" dimColor wrap="truncate">Autres discussions</Text> : null,
     ...autres.map(a => rang(T, surface, colonnes, depuisAutre(a, s.fermerAutre, s.ouvrirAutre), s.maintenant, s.animations)),
-    ligneJauge?.arbre ?? null,
-    // sur le bureau, les boutons sont dans la barre du bas : la ligne reste pour « Effacer », et le cache s'il n'a pas tenu
-    jauge && (s.boutons.length > 0 || cacheDessous !== null) ? dessinerBoutons(T, s.boutons, cacheDessous, s.expliquerCache) : null,
+    s.reglages.jauge && maxRows >= 3 ? dessinerJauge(T, surface, colonnes, s.mesures, s.maintenant, s.animations) : null,
+    // sur le bureau, les boutons sont dans la barre du bas : la ligne reste pour « Effacer »
+    jauge && s.boutons.length > 0 ? dessinerBoutons(T, s.boutons) : null,
     jauge && s.reglage?.ouvert ? dessinerReglages(T, surface, s.reglages, s.reglage) : null,
   ].filter(r => r !== null)
   if (rangs.length === 0) return null // sur le bureau, les boutons sont au pied de la zone de texte : rien d'autre à montrer

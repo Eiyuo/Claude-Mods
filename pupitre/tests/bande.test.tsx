@@ -13,40 +13,37 @@ describe('disposition de la jauge sur une ligne', () => {
     { nom: 'Limite 7 j', abrege: '7 j', pct: '31 %', court: '↻ 5 j 5 h' },
   ]
   const terminal = (t: string) => t.length
-  test('large : barres plafonnées, comptes à rebours gardés, et le cache au bout de la ligne', async () => {
-    expect(dispositionJauge(200, m, 10, terminal)).toEqual({ barre: 20, avecCourt: true, abrege: false, avecCache: true })
-  })
-  test('quand la place manque, le cache redescend sur sa ligne avant que la jauge perde quoi que ce soit', async () => {
-    expect(dispositionJauge(90, m, 10, terminal)).toEqual({ barre: 6, avecCourt: true, abrege: false, avecCache: false })
+  test('large : barres plafonnées, comptes à rebours gardés', async () => {
+    expect(dispositionJauge(200, m, terminal)).toEqual({ barre: 20, avecCourt: true, abrege: false })
   })
   test('étroit : les comptes à rebours partent avant que les barres deviennent trop petites', async () => {
-    expect(dispositionJauge(80, m, 0, terminal)).toEqual({ barre: 9, avecCourt: false, abrege: false, avecCache: false })
+    expect(dispositionJauge(80, m, terminal)).toEqual({ barre: 9, avecCourt: false, abrege: false })
   })
   test('très étroit : les noms raccourcissent, jamais moins de 4 colonnes de barre', async () => {
-    expect(dispositionJauge(40, m, 0, terminal)).toEqual({ barre: 4, avecCourt: false, abrege: true, avecCache: false })
+    expect(dispositionJauge(40, m, terminal)).toEqual({ barre: 4, avecCourt: false, abrege: true })
   })
   test('sur le bureau, chaque texte est estimé lettre par lettre, jamais sous sa largeur mesurée sur capture', async () => {
     // en colonnes de 8 px, mesurées sur la capture du 12/10/2026
     for (const [t, gras, mesure] of [['Contexte', false, 7.1], ['Limite 5 h', false, 7.2], ['Limite 7 jours', false, 10.0], ['54 %', true, 4.0],
-      ['36 %', true, 3.8], ['49 %', true, 3.9], ['↻ 1 h 57', false, 5.6], ['↻ 4 j 0 h', false, 5.9], ['Cache 100 % ⓘ', false, 10.8]] as const) {
+      ['36 %', true, 3.8], ['49 %', true, 3.9], ['↻ 1 h 57', false, 5.6], ['↻ 4 j 0 h', false, 5.9]] as const) {
       expect(largeurBureau(t, gras)).toBeGreaterThanOrEqual(mesure)
       expect(largeurBureau(t, gras)).toBeLessThanOrEqual(mesure * 1.15) // assez juste pour serrer la ligne
     }
   })
-  test('cas de la capture (94 colonnes, bureau) : tout tient sur une ligne, cache compris, en barres de 6', async () => {
+  test('cas de la capture (94 colonnes, bureau) : tout tient sur une ligne, en barres de 10', async () => {
     const capture = [
       { nom: 'Contexte', abrege: 'Contexte', pct: '54 %', court: '' },
       { nom: 'Limite 5 h', abrege: '5 h', pct: '36 %', court: '↻ 1 h 57' },
       { nom: 'Limite 7 jours', abrege: '7 jours', pct: '49 %', court: '↻ 4 j 0 h' },
     ]
-    expect(dispositionJauge(94, capture, largeurBureau('Cache 100 %'), largeurBureau)).toEqual({ barre: 6, avecCourt: true, abrege: false, avecCache: true })
+    expect(dispositionJauge(94, capture, largeurBureau)).toEqual({ barre: 10, avecCourt: true, abrege: false })
   })
   test('la largeur choisie ne dépasse jamais la place, de 30 à 200 colonnes', async () => {
-    for (const l of [terminal, largeurBureau]) for (const cache of [0, l('Cache 82 %')]) for (let c = 30; c <= 200; c++) {
-      const d = dispositionJauge(c, m, cache, l)
+    for (const l of [terminal, largeurBureau]) for (let c = 30; c <= 200; c++) {
+      const d = dispositionJauge(c, m, l)
       const texte = m.reduce((t, x) => t + l(d.abrege ? x.abrege : x.nom) + l(x.pct, true) + 2 + (d.avecCourt && x.court ? l(x.court) + 1 : 0), 0)
       const trait = 2 + l('│') // un écart de chaque côté du trait
-      const total = texte + trait * (m.length - 1) + (d.avecCache ? trait + cache : 0) + d.barre * m.length
+      const total = texte + trait * (m.length - 1) + d.barre * m.length
       if (!(d.abrege && d.barre === 4)) expect(total).toBeLessThanOrEqual(c) // le plancher seul peut déborder ; les textes se coupent alors avec « … »
     }
   })
@@ -596,33 +593,19 @@ test('une barre finie s efface toute seule 5 s après être passée au vert, mê
   await ui.unmount()
 })
 
-test('la jauge serrée : un trait entre ses éléments, le cache au bout de la ligne quand il tient, dessous sinon', async ($, on) => {
+test('la jauge serrée : un trait entre ses éléments, et plus de cache, même après une réponse', async ($, on) => {
   await preparer($, on)
   await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
   await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', usage: { model: 'm', input_tokens: 10, cache_read_input_tokens: 82, cache_creation_input_tokens: 8, output_tokens: 5 } } as never)
-  for (const surface of ['desktop', 'terminal'] as const) for (const [colonnes, surLaLigne] of [[120, true], [60, false]] as const) {
+  for (const surface of ['desktop', 'terminal'] as const) for (const colonnes of [120, 60]) {
     const ui = await $.ui.mount({ plugin: 'pupitre', surface, component: 'AbovePrompt', props: { ...BANDE.props, bodyColumns: colonnes } })
-    const rangs = ((await ui.drawn()) as unknown as { children: unknown[] }).children.map(c => JSON.stringify(c))
-    const jauge = rangs.find(r => r.includes('Contexte'))!
-    expect(jauge.match(/"│"/g)).toHaveLength(surLaLigne ? 3 : 2) // un trait entre chaque élément
+    const texte = JSON.stringify(await ui.drawn())
+    const jauge = ((await ui.drawn()) as unknown as { children: unknown[] }).children.map(c => JSON.stringify(c)).find(r => r.includes('Contexte'))!
+    expect(jauge.match(/"│"/g)).toHaveLength(2) // un trait entre chaque élément
     expect(jauge).not.toContain('space-between') // serrée, plus étalée sur toute la largeur
-    expect(jauge.includes('Cache 82 %')).toBe(surLaLigne)
-    expect(rangs.some(r => r.includes('Cache 82 % ⓘ'))).toBe(!surLaLigne) // pas la place : sur la ligne du dessous, comme avant
+    expect(texte).not.toContain('Cache') // retiré le 14/10/2026 : l'information n'était pas utile
     await ui.unmount()
   }
-})
-
-test('cache : la part de la dernière demande lue dans le cache, sur la ligne de la jauge, et un clic l explique', async ($, on) => {
-  const toasts: string[] = []
-  on('ui.toast', async ($, e) => { toasts.push(e.text); return { value: undefined } as never })
-  await preparer($, on)
-  await $.turn.start({ text: 'fais ceci', turnId: 't1' } as never)
-  await $.turn.complete({ answer: '', durationMs: 2000, isAborted: false, turnId: 't1', reason: 'answer', usage: { model: 'm', input_tokens: 10, cache_read_input_tokens: 82, cache_creation_input_tokens: 8, output_tokens: 5 } } as never)
-  const ui = await monter($, 'desktop')
-  expect(JSON.stringify(await ui.drawn())).toContain('Cache 82 %')
-  await ui.press({ key: 'cache' })
-  expect(toasts.some(t => t.includes('82 %') && t.includes('déjà en mémoire'))).toBe(true)
-  await ui.unmount()
 })
 
 const mesurer = (pct: number) => ({ context: { tokens: pct * 10, window: 1000, percent: pct }, rateLimits: [], changed: ['context'] }) as never
