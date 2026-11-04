@@ -92,6 +92,37 @@ test('chaque barre a sa largeur et sa hauteur fixées (sinon le bureau lui donne
   await ui.unmount()
 })
 
+test('si la place manque malgré l estimation, les barres de la jauge rétrécissent avant les textes', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: 1_000_000 })
+  await $.command.run({ command: 'pupitre', args: '' })
+  const ui = await $.ui.mount({ plugin: 'pupitre', surface: 'desktop', ...BANDE })
+  type Noeud = { type?: string; props?: Record<string, unknown>; children?: unknown[] }
+  const boites: Noeud[] = [] // les boîtes qui portent une barre de la jauge
+  const mesures: Noeud[] = [] // et celles qui les contiennent : « nom, barre, %, ↻ »
+  const parcourir = (n: Noeud) => {
+    const enfants = ((n.children ?? []) as Noeud[]).filter(c => c && typeof c === 'object')
+    const barre = (c: Noeud) => c.type === 'Box' && ((c.children ?? []) as Noeud[]).some(x => x?.type === 'Svg' && /^(Contexte|Limite)/.test(String(x.props?.alt)))
+    if (barre(n)) boites.push(n)
+    if (enfants.some(barre)) mesures.push(n)
+    enfants.forEach(parcourir)
+  }
+  parcourir((await ui.drawn()) as unknown as Noeud)
+  expect(boites).toHaveLength(3)
+  expect(mesures).toHaveLength(3)
+  for (const m of mesures) {
+    expect(m.props!.minWidth).toBe(0) // sinon la mesure garde toute sa largeur et les traits « │ » s'écrasent
+    expect(m.props!.flexShrink as number).toBeGreaterThan(1000) // les traits, eux, rétrécissent au rythme de 1
+  }
+  for (const b of boites) {
+    expect(b.props!.minWidth).toBe(0)
+    expect(b.props!.flexShrink as number).toBeGreaterThan(1000) // les textes, eux, rétrécissent au rythme de 1
+    const image = (b.children as Noeud[])[0]!
+    expect(image.props!.width as number).toBeLessThanOrEqual((b.props!.width as number) * 7.56) // l'image tient dans sa boîte
+  }
+  await ui.unmount()
+})
+
 test('au repos : la jauge seule sur une ligne, les boutons sur la ligne du dessous (sur le bureau, au pied de la zone de texte)', async ($, on) => {
   mock.store(on)
   mock.clock(on, { now: 1_000_000 })

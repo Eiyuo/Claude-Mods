@@ -41,6 +41,10 @@ export function dispositionJauge(colonnes: number, morceaux: readonly Morceau[],
   return { barre: Math.max(BARRE_MIN, Math.min(BARRE_MAX, barre(false, true))), avecCourt: false, abrege: true }
 }
 
+// Ce qui cède devant un texte, qui rétrécit au rythme de 1 : sa part devient négligeable, il ne se coupe en « … »
+// qu'une fois les barres à zéro. 10 000 : le plus que le moteur accepte.
+const CEDE = 10_000
+
 function mesure(T: Elements, surface: string, nom: string, affiche: string, m: Mesure, barre: number, avecCourt: boolean, maintenant: number, animations: Animations) {
   const { Box, Text, Svg } = T
   const pct = m.pct ?? 0
@@ -50,10 +54,13 @@ function mesure(T: Elements, surface: string, nom: string, affiche: string, m: M
   const dessin = surface === 'terminal' || Svg === undefined
     ? <Text dimColor wrap="truncate">{barreTexte(pct / 100, barre)}</Text>
     : <Svg source={svgSimple({ largeur: w, hauteur: 10, cellule: 2, rayon: 4, progression: pct / 100, palette: PALETTES_JAUGE[couleurJauge(pct)], alerte: couleurJauge(pct) === 'rouge', graine: graineDe(nom), maintenant, titre, animations })} alt={`${titre}, ${formatPct(m.pct)}`} width={w} height={10} />
+  // Si la place manque malgré l'estimation (l'application a changé ses tailles le 04/11/2026), la mesure rétrécit et sa
+  // barre cède la place : l'image se réduit à sa boîte, comme celles du fil. Sans `minWidth={0}`, la mesure garde toute sa
+  // largeur et ce sont les traits qui s'écrasent (vu sur capture).
   return (
-    <Box key={nom} flexDirection="row" alignItems="center" gap={1}>
+    <Box key={nom} flexDirection="row" alignItems="center" gap={1} minWidth={0} flexShrink={CEDE}>
       <Text dimColor wrap="truncate">{affiche}</Text>
-      {dessin}
+      <Box width={barre} minWidth={0} flexShrink={CEDE}>{dessin}</Box>
       <Text bold wrap="truncate">{formatPct(m.pct)}</Text>
       {court ? <Text dimColor wrap="truncate">{court}</Text> : null}
     </Box>
