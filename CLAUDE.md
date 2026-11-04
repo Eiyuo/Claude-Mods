@@ -37,6 +37,14 @@ $cli = (Get-ChildItem "$env:APPDATA\Claude\claude-code" -Filter claude.exe -Recu
 
 `claude` n'est pas dans le PATH : on prend le plus récent, livré avec l'application. Le contrôle des types (`tsc -p`) ne marche que sur une copie chargée à chaud, la seule où le moteur écrit ses types : `outils/vers-dev.sh <id-de-session>` la crée dans `~/.claude/dev-mods/`.
 
+## Recaler la jauge
+
+Si une mise à jour de l'application coupe les textes de la jauge (« Conte… », « 18… ») :
+1. `outils/vers-dev.sh <id-de-session> outils/pupitre-regle` affiche une règle au-dessus de la bande ; demander une capture.
+2. Sur la capture, le rouge fait 160 px (il donne l'agrandissement) et le bleu 20 colonnes (d'où `PX_COL`, pris un peu en dessous) ; chaque texte surligné en jaune donne sa largeur en colonnes.
+3. Reporter ces largeurs dans `MESURES` (`pupitre/tests/bande.test.tsx`), puis recaler `largeurBureau` jusqu'à ce que les tests passent.
+4. Retirer `pupitre-regle` du dossier des mods de la session.
+
 ## Versions et commits
 
 - Un changement visible : la version monte dans `pupitre/.claude-plugin/plugin.json`, et le README suit.

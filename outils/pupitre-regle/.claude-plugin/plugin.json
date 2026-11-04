@@ -1,0 +1,8 @@
+{
+  "name": "pupitre-regle",
+  "version": "0.1.0",
+  "description": "Outil de recalage du pupitre : une règle et les textes de la jauge surlignés, à mesurer sur une capture.",
+  "author": {
+    "name": "Eiyuo"
+  }
+}
