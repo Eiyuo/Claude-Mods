@@ -4,7 +4,9 @@ import { formatPct } from './jauge'
 import { chrono } from './textes'
 import { jaugeVisible, toutAllume, type Commande } from './reglages'
 
-export const PX_COL = 8 // pixels par colonne de la bande sur l'application (à confirmer, tâche 11)
+// Pixels par colonne de la bande sur l'application : 7,56 sur la capture du 04/11/2026 (20 colonnes = 151 px), 8 avant
+// sa mise à jour. Un peu moins que la mesure : une image ne déborde jamais de ses colonnes.
+export const PX_COL = 7.5
 
 // Table des éléments rendue par $.ui.resolve(e) ; typée lâchement car elle diffère d'une surface à l'autre.
 export type Elements = Record<string, (props: Record<string, unknown>) => unknown>
@@ -14,11 +16,12 @@ export type Morceau = { nom: string; abrege?: string; pct: string; court: string
 const BARRE_MAX = 20, BARRE_CONFORT = 6, BARRE_MIN = 4
 export type Largeur = (texte: string, gras?: boolean) => number // en colonnes
 
-// Largeur d'un texte sur le bureau, en colonnes de 8 px (PX_COL), lettre par lettre : calée sur les textes de la jauge
-// mesurés sur une capture du 12/10/2026 (« Limite 7 jours » y prend 10 colonnes, et non 13 à 0,95 par lettre), sans
-// jamais passer dessous : de 1 à 11 % au-dessus de chaque mesure.
+// Largeur d'un texte sur le bureau, en colonnes, lettre par lettre : calée sur les textes de la jauge mesurés sur une
+// capture du 04/11/2026, après la mise à jour de l'application (« Limite 7 jours » y prend 11 colonnes, contre 10 le
+// 12/10/2026), sans jamais passer dessous : de 1 à 12 % au-dessus de chaque mesure.
 export const largeurBureau: Largeur = (texte, gras = false) => Array.from(texte).reduce((l, c) =>
-  l + (c === ' ' ? 0.4 : /[iljtfr.,:;'·│]/.test(c) ? 0.5 : /[mwMW%]/.test(c) ? 1.3 : /[A-ZÀ-Ý]/.test(c) ? 1.15 : 1), 0) * (gras ? 1.1 : 1)
+  l + (c === ' ' ? 0.45 : c === '│' ? 1.3 : c === '↻' ? 1.45 : /[0-9]/.test(c) ? 1.05 : /[iljtfr.,:;'·]/.test(c) ? 0.45
+    : /[mwMW%]/.test(c) ? 1.3 : /[A-ZÀ-Ý]/.test(c) ? 1.25 : 1.2), 0) * (gras ? 1.1 : 1)
 
 // Jauge sur une seule ligne, serrée : « nom ▰▰▱ 86 % ↻ 2 h 12 │ … » (demande du 13/10/2026). Les barres prennent la
 // place qui reste (20 colonnes au plus). Quand la place manque, dans l'ordre : les comptes à rebours « ↻ » quittent la

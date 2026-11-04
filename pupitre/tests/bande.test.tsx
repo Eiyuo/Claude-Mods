@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
-import { dispositionJauge, largeurBureau, titreAutre } from '../hooks/bande'
+import { PX_COL, dispositionJauge, largeurBureau, titreAutre } from '../hooks/bande'
 import { CONSIGNE_CAP_AUTO, DEBUT_RELAIS } from '../hooks/textes'
 import { ficheDe } from '../hooks/partage'
 import type { LigneFil } from '../types'
@@ -22,21 +22,29 @@ describe('disposition de la jauge sur une ligne', () => {
   test('très étroit : les noms raccourcissent, jamais moins de 4 colonnes de barre', async () => {
     expect(dispositionJauge(40, m, terminal)).toEqual({ barre: 4, avecCourt: false, abrege: true })
   })
+  // En colonnes, mesurées sur la capture du 04/11/2026, après la mise à jour de l'application : chaque texte surligné,
+  // une colonne y faisant 7,56 px (20 colonnes = 151 px).
+  const MESURES: readonly (readonly [string, boolean, number])[] = [['Contexte', false, 7.30], ['Limite 5 h', false, 8.04], ['Limite 7 jours', false, 11.01],
+    ['5 h', false, 2.65], ['7 jours', false, 5.61], ['18 %', true, 3.92], ['100 %', true, 4.87], ['↻ 4 h 52', false, 7.09], ['↻ 2 j 13 h', false, 7.94],
+    ['│', false, 1.16], ['0000000000', false, 9.95]]
   test('sur le bureau, chaque texte est estimé lettre par lettre, jamais sous sa largeur mesurée sur capture', async () => {
-    // en colonnes de 8 px, mesurées sur la capture du 12/10/2026
-    for (const [t, gras, mesure] of [['Contexte', false, 7.1], ['Limite 5 h', false, 7.2], ['Limite 7 jours', false, 10.0], ['54 %', true, 4.0],
-      ['36 %', true, 3.8], ['49 %', true, 3.9], ['↻ 1 h 57', false, 5.6], ['↻ 4 j 0 h', false, 5.9]] as const) {
+    for (const [t, gras, mesure] of MESURES) {
       expect(largeurBureau(t, gras)).toBeGreaterThanOrEqual(mesure)
       expect(largeurBureau(t, gras)).toBeLessThanOrEqual(mesure * 1.15) // assez juste pour serrer la ligne
     }
   })
-  test('cas de la capture (94 colonnes, bureau) : tout tient sur une ligne, en barres de 10', async () => {
+  test('cas de la capture (99 colonnes, bureau) : tout tient sur une ligne, en barres de 9, sans rien couper', async () => {
     const capture = [
-      { nom: 'Contexte', abrege: 'Contexte', pct: '54 %', court: '' },
-      { nom: 'Limite 5 h', abrege: '5 h', pct: '36 %', court: '↻ 1 h 57' },
-      { nom: 'Limite 7 jours', abrege: '7 jours', pct: '49 %', court: '↻ 4 j 0 h' },
+      { nom: 'Contexte', abrege: 'Contexte', pct: '18 %', court: '' },
+      { nom: 'Limite 5 h', abrege: '5 h', pct: '18 %', court: '↻ 4 h 52' },
+      { nom: 'Limite 7 jours', abrege: '7 jours', pct: '18 %', court: '↻ 2 j 13 h' },
     ]
-    expect(dispositionJauge(94, capture, largeurBureau)).toEqual({ barre: 10, avecCourt: true, abrege: false })
+    const d = dispositionJauge(99, capture, largeurBureau)
+    expect(d).toEqual({ barre: 9, avecCourt: true, abrege: false })
+    // la ligne réelle : textes mesurés, un écart entre chaque élément, deux traits, et les images à PX_COL px par colonne
+    const reel = (t: string) => MESURES.find(m => m[0] === t)![2]
+    const textes = capture.reduce((s, m) => s + reel(m.nom) + reel(m.pct) + 2 + (m.court ? reel(m.court) + 1 : 0), 0)
+    expect(textes + 2 * (2 + reel('│')) + 3 * d.barre * PX_COL / 7.56).toBeLessThanOrEqual(99)
   })
   test('la largeur choisie ne dépasse jamais la place, de 30 à 200 colonnes', async () => {
     for (const l of [terminal, largeurBureau]) for (let c = 30; c <= 200; c++) {
