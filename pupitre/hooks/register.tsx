@@ -6,7 +6,7 @@ import { AUCUN, basculer, changerSeuil, jaugeVisible, lireAnimations, lireRelais
 import { MESURES_VIDES, lireMesures, type UsageLu } from './jauge'
 import { dessinerBande, dessinerBoutons, piedDe, type Bouton, type Elements, type Pied } from './bande'
 import { appliquerAppel, debutTour, encoreVisible, etape, finir, ligneDe, lignesGardees, nouveauSuivi, type Suivi } from './fil'
-import { CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, messageHumain, nettoyerReponse, promptPlume, relaisEcrit, type Capacite } from './textes'
+import { gras, CONSIGNE_CAP_AUTO, CONSIGNE_FIL, DEBUT_RELAIS, REPRISE_RELAIS, consigneRelais, SYSTEME_PLUME, contexteRecent, messageEchec, messageHumain, nettoyerReponse, promptFork, promptPlume, proteger, relaisEcrit, restaurer, type Capacite } from './textes'
 import { PERIME_MS, ficheDe, lireFiche, nomFichier, suivreAutres, titreDe, type Fiche } from './partage'
 import { palier } from './pixels'
 
@@ -37,7 +37,10 @@ let relaisDepuis: number | null = null // heure du clic sur « Passer le relais 
 // porte la consigne, et lui seul décide de la suite.
 let tourRelais: string | null = null
 const RELAIS_MAX_MS = 10 * 60_000 // sans tour de relais au bout de 10 min, la consigne s'est perdue : un clic relance
-let plumeEnCours = false // posé avant tout await : un double clic ne lance qu'une amélioration
+let plumeEnCours = false // posé avant tout await : un deuxième clic annule au lieu de lancer une autre amélioration
+let plumeTour = 0 // numéro de l'amélioration en cours : « Annuler » ou les 30 s le changent, et sa réponse ne sert plus
+let plumeArret: AbortController | null = null // coupe l'appel en cours ; la reprise de la conversation, elle, ne se coupe pas
+const PLUME_MAX_MS = 30_000
 const SEUIL_SON_MS = 30_000 // carillon seulement après un travail de plus de 30 s
 let tourEnCours = false // turn.start ne dit pas qui démarre : on ne remet à zéro qu'au début d'un tour principal
 let demandeTour = '' // le début de la demande en cours : titre de la ligne de Claude
@@ -68,7 +71,7 @@ async function boutonsDe($: Dollar, r: Reglages, pied: Pied, court = false): Pro
   const plume = await read($, plumeA)
   if (r.plume) {
     if (plume.original !== null) boutons.push({ cle: 'revenir', libelle: court ? 'Retour' : 'Revenir à mon texte', action: () => { void revenir($) } })
-    else boutons.push({ cle: 'plume', libelle: plume.enCours ? (court ? 'Améliorer…' : 'Amélioration…') : (court ? 'Améliorer' : 'Améliorer le prompt'), action: () => { void ameliorer($) } })
+    else boutons.push({ cle: 'plume', libelle: plume.enCours ? (court ? 'Annuler' : "Annuler l'amélioration") : (court ? 'Améliorer' : 'Améliorer le prompt'), action: () => { void ameliorer($) } })
   }
   boutons.push({ cle: 'reglages', libelle: court ? '⚙' : 'Réglages', action: () => { void update($, ouvertA, o => !o) } })
   return boutons
@@ -155,32 +158,72 @@ async function capacites($: Dollar): Promise<Capacite[]> {
   return out
 }
 
-async function ameliorer($: Dollar): Promise<void> {
-  if (plumeEnCours) return
-  plumeEnCours = true
-  try {
-    const { text: brouillon } = await $.prompt.read()
-    if (!brouillon.trim()) { $.ui.toast("Écris d'abord ta demande."); return }
-    await update($, plumeA, p => ({ ...p, enCours: true }))
+// La réécriture, repères des passages collés compris, ou le message qui dit pourquoi il n'y en a pas. D'abord avec toute
+// la conversation (Claude sait de quoi on parle) ; avant la première réponse d'une session, il n'y en a pas encore : la
+// demande part alors avec le contexte récent et la liste des outils.
+async function reecrire($: Dollar, brouillon: string, blocs: readonly string[]): Promise<string | { echec: string }> {
+  let r: Awaited<ReturnType<Dollar['model']['fork']>> | null = null
+  try { r = await $.model.fork({ prompt: promptFork(brouillon, blocs) }) } catch { r = null } // hôte qui ne reprend pas la conversation
+  let max = 0
+  if (r === null || (!r.isAnswered && r.reason === 'nothing-to-fork')) {
     let dossier = ''
     try { dossier = (await $.session.root()).split(/[\\/]/).pop() ?? '' } catch { /* dossier inconnu */ }
     let contexte = contexteRecent([], dossier)
     try { contexte = contexteRecent(await $.session.messages(), dossier) } catch { /* conversation illisible : la demande seule */ }
-    // une longue demande garde la place de sa réécriture
-    const demande = { system: SYSTEME_PLUME, prompt: promptPlume(brouillon, await capacites($), contexte), maxTokens: Math.min(8000, 2000 + Math.ceil(brouillon.length / 2)), timeoutMs: 60_000 }
-    // un modèle refusé (liste des modèles autorisés) rejette l'appel : on passe alors au modèle de la session
-    const essayer = async (modele: string | Promise<string>) => { try { return await $.model.complete({ ...demande, model: await modele }) } catch { return null } }
-    let r = await essayer('sonnet')
-    if (!r?.isAnswered) r = await essayer($.session.model())
-    const texte = r?.isAnswered ? nettoyerReponse(r.text) : ''
-    if (!texte) { $.ui.toast('Amélioration impossible : réessaie.'); return }
+    max = Math.min(8000, 2000 + Math.ceil(brouillon.length / 2)) // une longue demande garde la place de sa réécriture
+    const demande = { system: SYSTEME_PLUME, prompt: promptPlume(brouillon, await capacites($), contexte, blocs), maxTokens: max, timeoutMs: PLUME_MAX_MS }
+    const arret = plumeArret = new AbortController()
+    // un modèle refusé (liste des modèles autorisés) rejette l'appel ou répond une erreur : on passe au modèle de la session
+    const essayer = async (modele: string | Promise<string>) => { try { return await $.model.complete({ ...demande, model: await modele }, { signal: arret.signal }) } catch { return null } }
+    r = await essayer('sonnet')
+    if (r === null || (!r.isAnswered && r.reason === 'api-error' && r.error === 'invalid_request')) r = await essayer($.session.model())
+  }
+  if (r === null) return { echec: 'Amélioration impossible : réessaie.' }
+  if (!r.isAnswered) return { echec: messageEchec(r) }
+  const texte = nettoyerReponse(r.text)
+  if (texte === null || (max > 0 && r.usage.output_tokens >= max)) return { echec: "Pupitre : la réécriture a été coupée en route, rien n'est remplacé." }
+  return texte || { echec: 'Amélioration impossible : réessaie.' }
+}
+
+// « Annuler », ou les 30 s passées : la réponse qui arrivera ensuite ne sert plus, et le bouton redevient « Améliorer ».
+async function arreterPlume($: Dollar, message: string): Promise<void> {
+  plumeTour++
+  plumeArret?.abort()
+  plumeArret = null
+  plumeEnCours = false
+  await update($, plumeA, p => ({ ...p, enCours: false }))
+  $.ui.toast(message)
+}
+
+async function ameliorer($: Dollar): Promise<void> {
+  if (plumeEnCours) return arreterPlume($, "Pupitre : amélioration annulée, ton texte n'a pas bougé.") // le bouton dit « Annuler »
+  plumeEnCours = true
+  const tour = ++plumeTour
+  try {
+    const { text: brouillon } = await $.prompt.read()
+    if (!brouillon.trim()) { $.ui.toast("Écris d'abord ta demande."); return }
+    if (brouillon.trimStart().startsWith('/')) { $.ui.toast('Pupitre : une commande part telle quelle, rien à améliorer.'); return }
+    await update($, plumeA, p => ({ ...p, enCours: true }))
+    $.clock.after(PLUME_MAX_MS, () => {
+      if (tour === plumeTour && plumeEnCours) void arreterPlume($, `Pupitre : pas de réponse en ${PLUME_MAX_MS / 1000} s, ton texte n'a pas bougé. Réessaie, ou raccourcis ta demande.`)
+    })
+    const { texte: protege, blocs } = proteger(brouillon)
+    const issue = await reecrire($, protege, blocs)
+    if (tour !== plumeTour) return // annulée, ou arrivée après les 30 s
+    if (typeof issue !== 'string') { $.ui.toast(issue.echec); return }
+    const texte = restaurer(issue, blocs)
+    if (texte === null) { $.ui.toast("Pupitre : la réécriture a perdu un passage collé, rien n'est remplacé."); return }
     if ((await $.prompt.read()).text !== brouillon) { $.ui.toast("Ta demande a changé pendant l'amélioration : rien n'est remplacé."); return }
-    const fait = await $.prompt.fill({ text: texte, mode: 'replace' })
+    // les ajouts en gras (ou les seuls trous à remplir, quand presque tout change) ; le gras s'efface à la première retouche
+    const fait = await $.prompt.fill({ text: texte, mode: 'replace', decorations: gras(brouillon, texte).map(p => ({ ...p, bold: true })) })
     if (!fait.isFilled) { $.ui.toast("La zone de texte n'est pas disponible."); return }
     await update($, plumeA, p => ({ ...p, original: brouillon })) // « Revenir à mon texte » jusqu'à l'envoi
   } finally {
-    plumeEnCours = false
-    await update($, plumeA, p => ({ ...p, enCours: false }))
+    if (tour === plumeTour) { // sinon « Annuler » ou les 30 s ont déjà rendu le bouton, peut-être à une amélioration suivante
+      plumeEnCours = false
+      plumeArret = null
+      await update($, plumeA, p => ({ ...p, enCours: false }))
+    }
   }
 }
 

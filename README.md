@@ -4,7 +4,7 @@ Mes mods pour **Claude Code** : ajouts à l'interface et au comportement de Clau
 
 | Mod | Rôle | État |
 |---|---|---|
-| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.14) |
+| **pupitre** | Une bande au-dessus de la zone de texte : ce qui reste (contexte, limites), où en est Claude, et des raccourcis pour fixer la suite, passer le relais ou améliorer une demande | Disponible (version 1.0.15) |
 
 ## Aperçu
 
@@ -91,7 +91,7 @@ claude plugin uninstall pupitre@claude-mods
 | `/fil` | Allume ou éteint les barres de progression de Claude et de ses sous-agents |
 | `/relais` | Allume ou éteint le bouton « Passer le relais » |
 | `/plume` | Allume ou éteint le bouton « Améliorer le prompt » |
-| `/cap` | Allume ou éteint le cap automatique : à la fin de chaque réponse, Claude te demande « Et maintenant, on fait quoi ? » avec 3 suites |
+| `/cap` | Allume ou éteint le cap automatique : à la fin de chaque réponse, Claude te dit où on en est, « Et maintenant ? », avec 3 suites |
 
 À chaque changement, un petit message confirme ce qui est allumé ou éteint, par exemple « Pupitre : fil éteint ». Les réglages sont gardés d'une session à l'autre.
 
@@ -168,7 +168,7 @@ Si Windows demande moins d'animations, les étincelles, la bande de lumière, le
 
 ### Fixer le cap (`/cap`)
 
-Tape `/cap` pour allumer (ou éteindre) le cap automatique. Une fois allumé, à la fin de chaque réponse, quand le travail demandé est fini, Claude te demande dans la fenêtre à choix : « Et maintenant, on fait quoi ? », avec 3 suites possibles, sa recommandation en premier. Tu choisis, ou tu tapes autre chose, et il repart.
+Tape `/cap` pour allumer (ou éteindre) le cap automatique. Une fois allumé, à la fin de chaque réponse, quand le travail demandé est fini, Claude te demande dans la fenêtre à choix où on en est, puis « Et maintenant ? » (par exemple « Plume vérifiée sur ton écran. Et maintenant ? »), avec 3 suites : la suite directe, recommandée et en premier ; une vérification de ce qui reste incertain ; une autre direction utile. Chaque choix tient en quelques mots, dit combien de temps il prendra et prévient s'il publie, supprime ou envoie quelque chose. Une suite que tu n'as pas choisie peut revenir, mais jamais en premier deux fois de suite. Tu choisis, ou tu tapes autre chose, et il repart.
 
 Pour ça, une courte consigne part avec chacun de tes messages (tu ne la vois pas). Elle ne part pas avec une commande comme `/fil`.
 
@@ -205,11 +205,14 @@ Si `relais.md` n'a pas pu être écrit, la conversation n'est pas vidée et un m
 
 Tape (ou dicte) ta demande comme elle te vient, puis clique sur **« Améliorer le prompt »** :
 
-1. Ta demande est réécrite pour être plus précise : le but, le contexte, les contraintes et le résultat attendu. Elle garde ta langue, ton intention et tes contraintes mot pour mot, à peu près la même longueur, et rien n'est inventé. Si un point essentiel est ambigu, elle demande à Claude de te poser la question avant d'agir.
-2. La réécriture tient compte de la fin de la conversation (ta dernière demande, la dernière réponse de Claude) : « refais-les » ou « ce fichier » deviennent précis.
-3. Elle s'appuie sur ce que Claude a sous la main (skills, commandes, connecteurs, sous-agents), en commençant par ceux qui touchent à ta demande, et cite ceux qui serviront.
-4. Le texte amélioré remplace le tien dans la zone de texte. Relis-le, corrige si besoin, puis envoie.
-5. Jusqu'à l'envoi, le bouton **« Revenir à mon texte »** permet d'annuler, même après une retouche.
+1. Ta demande est réécrite pour être plus précise : le but, le contexte, les contraintes et le résultat attendu. Elle garde ta langue, ton intention et tes contraintes mot pour mot, à peu près la même longueur, et rien n'est inventé. S'il manque une information essentielle, elle laisse un trou à remplir, par exemple « [à préciser : lequel ?] », à compléter avant d'envoyer. Un bug est présenté en trois lignes (ce que tu fais, ce que tu attends, ce qui se passe), une nouvelle fonction par son but puis ce qu'elle doit faire ; une demande courte reste une phrase. Une demande dictée est nettoyée (« euh », répétitions, ponctuation) ; une demande déjà claire reste presque telle quelle.
+2. La réécriture tient compte de toute la conversation : « refais-les » ou « ce fichier » deviennent précis, même s'ils renvoient à un message plus ancien. Au tout début d'une session, avant la première réponse de Claude, elle s'appuie sur ta demande seule.
+3. Elle s'appuie sur ce que Claude a sous la main (skills, commandes, connecteurs, sous-agents) et cite ceux qui serviront.
+4. Un message d'erreur ou du code collé dans ta demande revient tel quel, mot pour mot. Si la réécriture en perdait un morceau, ou s'arrêtait en route, ton texte n'est pas remplacé. Une commande (« /fil »…) n'est jamais réécrite.
+5. Le texte amélioré remplace le tien dans la zone de texte, avec les mots ajoutés en gras, pour voir d'un coup d'œil ce qui a changé (le gras disparaît dès que tu retouches le texte). Relis-le, corrige si besoin, puis envoie.
+6. Jusqu'à l'envoi, le bouton **« Revenir à mon texte »** permet d'annuler, même après une retouche.
+
+Pendant l'amélioration, le bouton devient **« Annuler »**. Sans réponse au bout de 30 secondes, elle s'arrête d'elle-même. Dans les deux cas, ton texte ne bouge pas, et un message dit ce qui s'est passé (limite d'utilisation atteinte, Claude surchargé…).
 
 ### Où ça marche
 

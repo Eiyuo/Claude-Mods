@@ -870,6 +870,123 @@ test('« Améliorer le prompt » : réécrit avec la conversation, et « Revenir
 const libelles = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
   (await ui.findAll({ type: 'Button' })).map(b => String(b.props.label))
 
+// La plume sur le bureau, avec `brouillon` dans la zone de texte : rend la zone, les notifications et l'horloge.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function plume($: any, on: any, brouillon: string) {
+  const etat = { boite: brouillon, toasts: [] as string[], gras: [] as unknown[] }
+  on('prompt.read', async () => ({ value: { text: etat.boite, cursor: etat.boite.length } }) as never)
+  on('prompt.fill', async ($: unknown, e: { text: string; decorations?: unknown[] }) => { etat.boite = e.text; etat.gras = e.decorations ?? []; return { isFilled: true } as never })
+  on('ui.toast', async ($: unknown, e: { text: string }) => { etat.toasts.push(e.text); return { value: undefined } as never })
+  const horloge = await preparer($, on)
+  const ui = await monter($, 'desktop')
+  return { etat, horloge, ui }
+}
+const ERREUR_COLLEE = "TypeError: x is undefined\n    at main (C:\\app\\index.js:12:5)"
+const reponse = (text: string, usage = {}) => ({ value: { isAnswered: true, text, usage } }) as never
+
+test('« Améliorer » : avec toute la conversation, la réécriture remplace la demande et remet le message d erreur collé mot pour mot', async ($, on) => {
+  const forks: string[] = []
+  on('model.fork', async ($, e) => { forks.push(e.prompt); return reponse("<<<\nCorrige l'erreur ci-dessous.\n⟦1⟧\n>>>") })
+  on('model.complete', async () => { throw new Error('la demande seule ne sert pas ici') })
+  const { etat, ui } = await plume($, on, `corrige ça stp\n${ERREUR_COLLEE}`)
+  await ui.press({ key: 'plume' })
+  expect(forks).toHaveLength(1)
+  expect(forks[0]).toContain('corrige ça stp\n⟦1⟧') // le passage collé est à part, derrière son repère
+  expect(etat.boite).toBe(`Corrige l'erreur ci-dessous.\n${ERREUR_COLLEE}`)
+  expect(await libelles(ui)).toContain('Retour')
+  await ui.unmount()
+})
+
+test('« Améliorer » : les mots ajoutés par la réécriture sont en gras dans la zone de texte', async ($, on) => {
+  on('model.fork', async () => reponse('<<<\nVérifie que la jauge ne coupe plus rien.\n>>>'))
+  const { etat, ui } = await plume($, on, 'euh tu peux enfin vérifier que la jauge elle coupe plus rien quoi')
+  await ui.press({ key: 'plume' })
+  expect(etat.boite).toBe('Vérifie que la jauge ne coupe plus rien.')
+  expect(etat.gras).toEqual([{ start: 0, end: 7, bold: true }, { start: 21, end: 23, bold: true }])
+  await ui.unmount()
+})
+
+test('« Améliorer » : en début de session, rien à reprendre, la réécriture passe par la demande et le contexte récent', async ($, on) => {
+  const completes: string[] = []
+  on('model.fork', async () => ({ value: { isAnswered: false, reason: 'nothing-to-fork' } }) as never)
+  on('model.complete', async ($, e) => { completes.push(e.prompt); return reponse('<<<\nRéécrit.\n>>>') })
+  const { etat, ui } = await plume($, on, 'refais la page')
+  await ui.press({ key: 'plume' })
+  expect(completes).toHaveLength(1)
+  expect(etat.boite).toBe('Réécrit.')
+  await ui.unmount()
+})
+
+test('« Améliorer » : une réécriture qui perd un passage collé, ou coupée en route, ne remplace rien et le dit', async ($, on) => {
+  let texte = '<<<\nCorrige l erreur.\n>>>' // le repère ⟦1⟧ a disparu
+  on('model.fork', async () => ({ value: { isAnswered: false, reason: 'nothing-to-fork' } }) as never)
+  on('model.complete', async ($, e) => reponse(texte, { output_tokens: texte.startsWith('<<<') ? 10 : e.maxTokens }))
+  const { etat, ui } = await plume($, on, `corrige ça\n${ERREUR_COLLEE}`)
+  await ui.press({ key: 'plume' })
+  expect(etat.boite).toBe(`corrige ça\n${ERREUR_COLLEE}`)
+  expect(etat.toasts.some(t => t.includes('passage collé'))).toBe(true)
+  texte = 'Corrige l erreur ⟦1⟧ et' // la limite de longueur atteinte : coupée
+  await ui.press({ key: 'plume' })
+  expect(etat.boite).toBe(`corrige ça\n${ERREUR_COLLEE}`)
+  expect(etat.toasts.some(t => t.includes('coupée'))).toBe(true)
+  await ui.unmount()
+})
+
+test('« Améliorer » : une commande « / » part telle quelle, sans appel à Claude', async ($, on) => {
+  let appels = 0
+  on('model.fork', async () => { appels++; return reponse('<<<\nx\n>>>') })
+  on('model.complete', async () => { appels++; return reponse('<<<\nx\n>>>') })
+  const { etat, ui } = await plume($, on, '/fil')
+  await ui.press({ key: 'plume' })
+  expect(appels).toBe(0)
+  expect(etat.boite).toBe('/fil')
+  expect(etat.toasts.some(t => t.includes('commande'))).toBe(true)
+  await ui.unmount()
+})
+
+test('« Améliorer » : pendant l amélioration le bouton devient « Annuler » ; un clic arrête, et la réponse arrivée après ne remplace rien', async ($, on) => {
+  let repondre!: (v: unknown) => void
+  on('model.fork', async () => new Promise(r => { repondre = r }) as never)
+  const { etat, horloge, ui } = await plume($, on, 'refais la page')
+  await ui.press({ key: 'plume' })
+  await horloge.advance(0)
+  expect(await libelles(ui)).toContain('Annuler')
+  await ui.press({ key: 'plume' })
+  expect(etat.toasts.some(t => t.includes('annulée'))).toBe(true)
+  expect(await libelles(ui)).toContain('Améliorer')
+  repondre(reponse('<<<\nRéécrit trop tard.\n>>>'))
+  await horloge.advance(0)
+  expect(etat.boite).toBe('refais la page')
+  await ui.unmount()
+})
+
+test('« Améliorer » : sans réponse au bout de 30 s, on arrête, sans deuxième essai, et ton texte ne bouge pas', async ($, on) => {
+  let appels = 0
+  on('model.fork', async () => { appels++; return new Promise(() => {}) as never })
+  on('model.complete', async () => { appels++; return new Promise(() => {}) as never })
+  const { etat, horloge, ui } = await plume($, on, 'refais la page')
+  await ui.press({ key: 'plume' })
+  await horloge.advance(30_000)
+  expect(appels).toBe(1)
+  expect(etat.toasts.some(t => t.includes('30 s'))).toBe(true)
+  expect(etat.boite).toBe('refais la page')
+  expect(await libelles(ui)).toContain('Améliorer')
+  await ui.unmount()
+})
+
+test('« Améliorer » : le message dit pourquoi l amélioration a échoué', async ($, on) => {
+  let erreur = 'rate_limit'
+  on('model.fork', async () => ({ value: { isAnswered: false, reason: 'api-error', status: 429, error: erreur, usage: {} } }) as never)
+  const { etat, ui } = await plume($, on, 'refais la page')
+  await ui.press({ key: 'plume' })
+  expect(etat.toasts.at(-1)).toContain('limite')
+  erreur = 'overloaded'
+  await ui.press({ key: 'plume' })
+  expect(etat.toasts.at(-1)).toContain('surchargé')
+  expect(etat.boite).toBe('refais la page')
+  await ui.unmount()
+})
+
 test('« Réglages » déplie une ligne avec un bouton par fonction, puis se replie', async ($, on) => {
   await preparer($, on)
   for (const surface of ['terminal', 'desktop'] as const) {
